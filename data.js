@@ -35,9 +35,9 @@ window.BATTLE_DATA = (function () {
     title:"所羅門攻略戰", subtitle:"機動戰士高達 · 一年戰爭 · Battle of Solomon · U.C.0079.11",
     theme:{
       grade:{ vignette:0.05, grain:0.0, brightness:0.4, filter:"contrast(1.2)" },
-      sky:{ day:"#000005", night:"#000000" },
-      sea:"#000000",
-      fog:0.00001,
+      sky:{ day:"#000000", night:"#000000" },
+      sea:"#00000000",
+      fog:0.000008,
     },
   };
 
@@ -84,10 +84,7 @@ window.BATTLE_DATA = (function () {
       { name_zh:"所羅門要塞", name_en:"Solomon Fortress", type:"fort", lng:176.5, lat:-3.5 },
       { name_zh:"太陽系統", name_en:"Solar System Array", type:"fort", lng:177.7, lat:-2.4 },
     ],
-    lines:[
-      { name_zh:"吉翁初始防禦圈", name_en:"Zeon defence perimeter", color:"#cf2a2a",
-        path:[[176.1,-3.0],[176.5,-2.7],[176.9,-3.0],[177.2,-3.5],[176.9,-4.0],[176.5,-4.3],[176.1,-4.0],[175.8,-3.5],[176.1,-3.0]] },
-    ],
+    lines:[],
   };
 
   const units = [
@@ -282,12 +279,7 @@ window.BATTLE_DATA = (function () {
     { f:"zeon", from:[176.5,-3.5], to:[175.5,-4.5], d:10.0, kind:"retreat", label:"吉翁殘軍撤退 Zeon withdrawal" },
   ];
 
-  const fronts = [
-    { d:1,  path:[[176.1,-3.0],[176.5,-2.7],[176.9,-3.0],[177.2,-3.5],[176.9,-4.0],[176.5,-4.3],[176.1,-4.0],[175.8,-3.5],[176.1,-3.0]] },
-    { d:4,  path:[[176.2,-3.1],[176.6,-2.8],[177.0,-3.2],[177.2,-3.5],[177.0,-3.9],[176.6,-4.2],[176.2,-4.0],[175.9,-3.5],[176.2,-3.1]] },
-    { d:7,  path:[[176.3,-3.2],[176.5,-3.0],[176.8,-3.2],[177.0,-3.5],[176.8,-3.9],[176.5,-4.1],[176.3,-3.9],[176.1,-3.5],[176.3,-3.2]] },
-    { d:10, path:[[176.3,-3.3],[176.5,-3.1],[176.7,-3.3],[176.8,-3.5],[176.7,-3.7],[176.5,-3.9],[176.3,-3.7],[176.2,-3.5],[176.3,-3.3]] },
-  ];
+  const fronts = [];
 
   const weather = [
     { d:1,  night:0.0, fog:0.0, rain:0.0, smoke:0.00, zh:"宇宙虛空",    en:"The void" },
@@ -314,7 +306,7 @@ window.BATTLE_DATA = (function () {
   const storyboard = [
 
     // S1 · 序幕 — 要塞的沉默 · hold:20s
-    { day:1.0, hold:20, cam:{lng:176.5, lat:-3.5, dist:2400, az:5, el:55, orbit:0.6},
+    { day:1.0, hold:20, cam:{lng:176.5, lat:-3.5, dist:2400, az:5, el:35, orbit:0.6},
       title_zh:"序幕 — 要塞的沉默", title_en:"Prelude — The Silence of the Fortress",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"奧德薩之後，吉翁放棄地球，全面收縮宇宙防線。所羅門要塞——Side 5 小行星帶中的鋼鐵巨城——是最後一道防壁。道森・ザビ 中將鎮守此地，等待聯邦的鋼鐵洪流。",
@@ -322,7 +314,7 @@ window.BATTLE_DATA = (function () {
       side:"zeon", focus:["zeon_solomon"], commanders:[{zh:"道森・ザビ 中將",en:"V.Adm. Dozle Zabi"}] },
 
     // S2 · 聯邦集結 · hold:18s
-    { day:2.0, hold:18, cam:{lng:176.8, lat:-3.8, dist:2100, az:-18, el:48, orbit:0.7},
+    { day:2.0, hold:18, cam:{lng:176.8, lat:-3.8, dist:2100, az:-18, el:30, orbit:0.7},
       title_zh:"聯邦集結", title_en:"The Federation Assembles",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"雷比爾將軍率第一、第二聯合艦隊從東南兩路逼近。白色基地隨第二艦隊南翼推進。道森警覺敵情，啟動要塞防禦配置。",
@@ -330,7 +322,7 @@ window.BATTLE_DATA = (function () {
       side:"eff", focus:["eff_fleet1","eff_fleet2","eff_white_base"], commanders:[{zh:"雷比爾將軍",en:"Gen. Revil"}] },
 
     // S3 · 第一波接觸 · hold:16s
-    { day:3.0, hold:16, cam:{lng:177.0, lat:-3.4, dist:1200, az:30, el:42, orbit:0.9},
+    { day:3.0, hold:16, cam:{lng:177.0, lat:-3.4, dist:1200, az:30, el:26, orbit:0.9},
       title_zh:"第一波接觸", title_en:"First Contact",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"吉翁東圈 MS 部隊出擊迎擊聯邦前鋒。每一公里都要以機體換來——鋼鐵在虛空中燃燒。",
@@ -338,7 +330,7 @@ window.BATTLE_DATA = (function () {
       side:"zeon", focus:["zeon_east_ms","eff_fleet1_ms"], commanders:[] },
 
     // S4 · 防禦圈全面激活 · hold:16s
-    { day:4.0, hold:16, cam:{lng:176.5, lat:-3.5, dist:1700, az:70, el:50, orbit:0.8},
+    { day:4.0, hold:16, cam:{lng:176.5, lat:-3.5, dist:1700, az:70, el:32, orbit:0.8},
       title_zh:"防禦圈全面激活", title_en:"Full Defence Perimeter Activated",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"道森下令全線出擊。北圈、東圈、南圈三路 MS 部隊同時輻射出擊，形成立體包圍網。聯邦艦隊正面承壓。",
@@ -346,7 +338,7 @@ window.BATTLE_DATA = (function () {
       side:"zeon", focus:["zeon_north_ms","zeon_east_ms","zeon_south_ms"], commanders:[{zh:"道森・ザビ 中將",en:"V.Adm. Dozle Zabi"}] },
 
     // S5 · 太陽系統展開 · hold:15s
-    { day:5.0, hold:15, cam:{lng:177.5, lat:-2.7, dist:1500, az:-15, el:44, orbit:0.7},
+    { day:5.0, hold:15, cam:{lng:177.5, lat:-2.7, dist:1500, az:-15, el:28, orbit:0.7},
       title_zh:"太陽系統展開", title_en:"Solar System Deploys",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"聯邦秘密武器——太陽系統超大型反射砲陣列——緩緩展開就位。艦隊後退讓路。吉翁的末日，在光速之中悄然到來。",
@@ -354,7 +346,7 @@ window.BATTLE_DATA = (function () {
       side:"eff", focus:["eff_solar_system","eff_fleet1"], commanders:[] },
 
     // S6 · 太陽系統發動 · hold:22s
-    { day:6.0, hold:22, cam:{lng:177.0, lat:-3.1, dist:1100, az:10, el:40, orbit:1.2},
+    { day:6.0, hold:22, cam:{lng:177.0, lat:-3.1, dist:1100, az:10, el:25, orbit:1.2},
       title_zh:"太陽系統發動", title_en:"Solar System Fires",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"反射砲陣列對準所羅門外圈——一擊。光束橫掃：東圈 MS 先蒸發，北圈次之，南圈再次。吉翁三道防禦圈，瓦解於一瞬之間。聯邦艦隊乘勢急推。",
@@ -362,7 +354,7 @@ window.BATTLE_DATA = (function () {
       side:"eff", focus:["eff_solar_system","zeon_east_ms","zeon_north_ms","zeon_south_ms"], commanders:[] },
 
     // S7 · 防線崩潰突破 · hold:16s
-    { day:7.0, hold:16, cam:{lng:176.5, lat:-3.5, dist:1000, az:50, el:38, orbit:1.0},
+    { day:7.0, hold:16, cam:{lng:176.5, lat:-3.5, dist:1000, az:50, el:28, orbit:1.0},
       title_zh:"防線崩潰突破", title_en:"Defence Line Collapses",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"外圈盡失，聯邦全線衝入。第一艦隊正面突破，第二艦隊南翼包抄，白色基地衝入要塞側翼。吉翁殘兵節節後退，收縮至所羅門核心。",
@@ -370,7 +362,7 @@ window.BATTLE_DATA = (function () {
       side:"eff", focus:["eff_fleet1","eff_fleet2","eff_white_base","zeon_remnant_ms"], commanders:[{zh:"雷比爾將軍",en:"Gen. Revil"}] },
 
     // S8 · Elmeth 出擊與殞落 · hold:25s
-    { day:8.0, hold:25, cam:{lng:176.8, lat:-2.9, dist:800, az:140, el:34, orbit:1.5},
+    { day:8.0, hold:25, cam:{lng:176.8, lat:-2.9, dist:800, az:140, el:22, orbit:1.5},
       title_zh:"Elmeth 出擊與殞落", title_en:"Elmeth Sorties — and Falls",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"夏亞命拉拉蘇駕駛試驗型 Elmeth 出擊，以新人類感應攻擊聯邦艦隊。阿姆羅的高達截擊——兩個新人類的感應在虛空中交錯。拉拉蘇陣亡。所羅門的棋局，已成定局。",
@@ -378,7 +370,7 @@ window.BATTLE_DATA = (function () {
       side:"zeon", focus:["zeon_elmeth","eff_gundam"], commanders:[{zh:"夏亞・アズナブル",en:"Char Aznable"},{zh:"拉拉蘇・阿斯納布爾",en:"Lalah Sune"}] },
 
     // S9 · ドズル最後一戰 · hold:20s
-    { day:9.0, hold:20, cam:{lng:176.7, lat:-3.4, dist:600, az:180, el:32, orbit:1.6},
+    { day:9.0, hold:20, cam:{lng:176.7, lat:-3.4, dist:600, az:180, el:20, orbit:1.6},
       title_zh:"ドズル最後一戰", title_en:"Dozle's Last Stand",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"道森・ザビ 中將親自乘坐 Big Zam——宇宙最強巨型機動裝甲——衝出要塞，以一己之力壓制聯邦艦隊，掩護所羅門撤退。聯邦前鋒艦接連撃沉。最終，Big Zam 爆炸，道森壯烈戰死。",
@@ -386,7 +378,7 @@ window.BATTLE_DATA = (function () {
       side:"zeon", focus:["zeon_big_zam_charge","eff_vanguard_a","eff_vanguard_b"], commanders:[{zh:"道森・ザビ 中將",en:"V.Adm. Dozle Zabi"}] },
 
     // S10 · 所羅門陷落 · hold:18s
-    { day:10.0, hold:18, cam:{lng:176.5, lat:-3.5, dist:2300, az:10, el:52, orbit:0.7},
+    { day:10.0, hold:18, cam:{lng:176.5, lat:-3.5, dist:2300, az:10, el:33, orbit:0.7},
       title_zh:"所羅門陷落", title_en:"Solomon Falls",
       dateLabel:"U.C. 0079.11 · 下旬",
       narration_zh:"所羅門陷落。地球聯邦旗升起，要塞改名コンペイトウ（金平糖），成為聯邦最終決戰前進基地。吉翁殘艦在暗夜中消散——一年戰爭，進入最後倒數。",
