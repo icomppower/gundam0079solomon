@@ -36,8 +36,8 @@ window.BATTLE_DATA = (function () {
     theme:{
       grade:{ vignette:0.05, grain:0.0, brightness:0.4, filter:"contrast(1.2)" },
       sky:{ day:"#000000", night:"#000000" },
-      sea:"#00000000",
-      fog:0.000008,
+      sea:"#000000",
+      fog:0.00001,
     },
   };
 
