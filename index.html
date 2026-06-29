@@ -3,249 +3,652 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>所羅門攻略戰 · Battle of Solomon · 機動戰士高達 U.C.0079</title>
-<meta name="description" content="A self-playing, TV-documentary-style 3D production of the Battle of Solomon (late November U.C. 0079) from Mobile Suit Gundam. The Solar System fires; Dozle Zabi makes his last stand in the Big Zam; Solomon falls. Bilingual Traditional Chinese and English. A fan-made, non-commercial tribute; Mobile Suit Gundam is © Sotsu, Sunrise." />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="所羅門攻略戰 · Battle of Solomon (U.C. 0079)" />
-<meta property="og:description" content="The Earth Federation deploys the Solar System super-weapon and storms Solomon Fortress in the Side 5 asteroid belt. Dozle Zabi dies in the Big Zam. Solomon falls. A self-playing 3D documentary. Bilingual 繁體中文 / English. Fan tribute to Mobile Suit Gundam (© Sotsu, Sunrise)." />
-<meta property="og:url" content="https://icomppower.github.io/gundam0079solomon/" />
+<title>所羅門攻略戰 · Battle of Solomon · U.C. 0079</title>
+<meta name="description" content="機動戰士高達 U.C. 0079 — 所羅門攻略戰。Three.js 單檔 3D 太空紀錄片，10 幕自播：聯邦艦隊集結、太陽系統發動、Big Zam 最後一戰、要塞陷落。Built on icomppower/space-engine." />
 <meta name="author" content="Johnny Lai — https://www.linkedin.com/in/icomppower/" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000005'/></svg>" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="所羅門攻略戰 · Battle of Solomon · U.C. 0079" />
+<meta property="og:description" content="From-scratch single-file 3D space documentary on Three.js — 10-act auto-play of the Battle of Solomon." />
+<meta property="og:url" content="https://icomppower.github.io/gundam0079solomon/" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000308'/><circle cx='8' cy='8' r='3' fill='%23f5c46b'/></svg>" />
 <style>
   :root{
-    --ink:#eee6d2; --ink-dim:#b3a98c; --paper:#000005;
-    --panel:rgba(12,15,21,.74); --panel-edge:rgba(210,190,140,.26); --accent:#d8c08a;
-    --mono:"Consolas","SFMono-Regular",ui-monospace,monospace;
-    --font-display:"Microsoft JhengHei","PingFang TC","Noto Sans TC","Heiti TC",sans-serif;
+    --ink:#dfe6f0; --ink-dim:#8aa0bc; --void:#000308;
+    --amber:#f5c46b; --amber-glow:rgba(245,196,107,.55);
+    --blue:#86b9ff; --blue-glow:rgba(134,185,255,.55);
+    --panel:rgba(8,12,20,.72); --edge:rgba(140,180,240,.22);
+    --mono:"SFMono-Regular",Consolas,ui-monospace,monospace;
+    --sans:"Inter","Noto Sans TC","Helvetica Neue",Arial,system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; } }
-  html,body{width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:var(--font-display)}
-  .lbl .zh,.unit .name,#title h1,#caption .ttl,#caption .narr .nz,#caption .str,#boot .bt,#notes-body,#resume{direction:var(--text-dir,ltr)}
-  .lbl .en,#title .sub,#caption .ttl .en,#caption .narr .ne,#caption .date,#caption .cmd,#scene-label{direction:ltr;unicode-bidi:isolate}
-  #scene{position:fixed;inset:0;z-index:1}
-  #lower-scrim{position:fixed;left:0;right:0;bottom:0;height:44%;z-index:1;pointer-events:none;
-    background:linear-gradient(to top, rgba(4,7,12,0.84) 0%, rgba(4,7,12,0.5) 36%, rgba(4,7,12,0) 100%)}
-  #labels{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:var(--sans)}
+  #scene{position:fixed;inset:0;z-index:0}
 
-  .lbl{transform:translate(-50%,-50%);text-align:center;text-shadow:0 1px 4px #000,0 0 8px #000;white-space:nowrap;user-select:none;transition:opacity .45s}
-  .lbl .zh{font-family:var(--font-display);font-weight:700;letter-spacing:1px}
-  .lbl .en{font-family:var(--mono);letter-spacing:.5px;opacity:.72;font-size:.62em}
-  .lbl.region .zh{font-size:19px;color:#f2ead2}
-  .lbl.peak .zh{font-size:13px;color:#e7d6a6}
-  .lbl.peak::before{content:"▲";display:block;font-size:9px;color:#cdb877;margin-bottom:-2px}
-  .lbl.bay .zh,.lbl.town .zh{font-size:12px;color:#bfd4e8}
-  .lbl.fort .zh{font-size:12px;color:#f0b48a}
-  .lbl.linelbl .zh{font-size:12px;font-weight:700;letter-spacing:1px}
+  /* overlays that `h` toggles */
+  .overlay{transition:opacity .4s ease}
+  body.bare .overlay{opacity:0}
 
-  .unit{transform:translate(-50%,-115%);min-width:90px;pointer-events:none;text-align:center;transition:opacity .45s}
-  .unit .name{font-family:var(--font-display);font-weight:700;font-size:12px;line-height:1.15;text-shadow:0 1px 3px #000,0 0 6px #000}
-  .unit .cmd{font-family:var(--mono);font-size:9.5px;opacity:.85;text-shadow:0 1px 2px #000}
+  /* act title — top-left */
+  #act{position:fixed;left:22px;top:20px;z-index:3;pointer-events:none;
+    font:600 13px/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--amber);text-shadow:0 0 10px var(--amber-glow),0 1px 3px #000}
+  #act .n{color:var(--ink-dim);font-weight:400;margin-right:8px}
 
-  .panel{background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;backdrop-filter:blur(7px);box-shadow:0 8px 30px rgba(0,0,0,.55)}
-  #hud-tl{position:fixed;z-index:5;top:16px;left:18px;display:flex;flex-direction:column;align-items:flex-start;gap:9px;max-width:min(330px,82vw);pointer-events:none}
-  #title{padding:9px 15px 10px;pointer-events:auto}
-  #title h1{font-family:var(--font-display);font-size:21px;letter-spacing:3px;color:#f4ecd6;line-height:1}
-  #title .sub{font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--ink-dim);margin-top:4px}
-  #notes-btn,#lang-btn,#music-btn{margin-top:7px;font-family:var(--mono);font-size:9.5px;letter-spacing:.5px;color:var(--accent);
-    background:rgba(216,192,138,.08);border:1px solid var(--panel-edge);border-radius:6px;padding:3px 8px;cursor:pointer;transition:.18s}
-  #notes-btn:hover,#lang-btn:hover,#music-btn:hover{background:rgba(216,192,138,.2)}
-  #lang-btn,#music-btn{margin-left:6px}
-  #music-btn.off{opacity:.5}
-  #title .credit{margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.2px;color:var(--ink-dim);line-height:1.45;max-width:230px}
-  #title .credit a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(216,192,138,.45)}
-  #title .credit a:hover{color:#fff}
-  #credit{position:fixed;z-index:6;left:50%;bottom:5px;transform:translateX(-50%);max-width:94vw;text-align:center;
-    font-family:var(--mono);font-size:10px;letter-spacing:.3px;color:rgba(216,222,232,.66);text-shadow:0 1px 2px #000,0 0 5px #000;pointer-events:none}
-  #credit a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(216,192,138,.55);pointer-events:auto}
-  #credit a:hover{color:#fff}
+  /* narration band — bottom-center */
+  #narr{position:fixed;left:50%;bottom:54px;z-index:3;transform:translateX(-50%);
+    width:min(820px,90vw);text-align:center;pointer-events:none}
+  #cc{display:block;margin-bottom:10px;line-height:1}
+  .cc{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.72rem;
+    font-weight:700;margin:0 3px;letter-spacing:.08em;font-family:var(--mono)}
+  .cc.canon{background:#1b5e20;color:#fff;} .cc.variant{background:#e65100;color:#fff;}
+  .cc.supp{background:#1a237e;color:#fff;} .cc.staging{background:#4a148c;color:#fff;}
+  #ntxt{display:inline-block;font:400 15px/1.7 var(--sans);color:var(--ink);
+    letter-spacing:.02em;text-shadow:0 1px 6px #000,0 0 18px rgba(0,0,0,.8);
+    background:var(--panel);padding:7px 16px;border-radius:4px;
+    border:1px solid var(--edge);backdrop-filter:blur(3px)}
 
-  #key{position:fixed;z-index:5;top:16px;right:18px;padding:8px 12px;font-size:11px}
-  #key .row{display:flex;align-items:center;gap:7px;margin:2px 0}
-  #key .sw{width:11px;height:11px;border-radius:3px;box-shadow:0 0 6px currentColor}
-  #key .ln{width:16px;height:0;border-top:3px solid currentColor;border-radius:2px;box-shadow:0 0 6px currentColor}
-  #key .front{color:#ffb24a}
-  #key .sep{height:1px;background:var(--panel-edge);margin:6px 0}
-  #key .syms{margin-top:5px}
-  #key .syms>summary{cursor:pointer;color:var(--accent);font-size:10px;letter-spacing:.5px;list-style:none;outline:none;opacity:.92}
-  #key .syms>summary::-webkit-details-marker{display:none}
-  #key .syms>summary::before{content:"▸ ";font-size:9px}
-  #key .syms[open]>summary::before{content:"▾ "}
-  #key .syms .row{margin:3px 0}
-  #key .syms:not([open]) > :not(summary){display:none}
-  #key .gl{display:inline-flex;align-items:center;justify-content:center;width:14px;font-size:12px;color:var(--ink)}
-  #key .gl.mini{width:16px;height:6px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden}
-  #key .gl.mini>i{display:block;height:100%;width:62%}
-  #key .flagsw{width:24px;height:16px;border-radius:2px;flex:0 0 auto;box-shadow:0 0 4px rgba(0,0,0,.55)}
-  #key .syms .row .en{opacity:.55}
-  #disclaimer{max-width:100%;font-size:9.5px;line-height:1.32;
-    color:rgba(228,234,242,0.92);text-shadow:0 1px 2px #000,0 0 4px #000,0 0 9px rgba(0,0,0,.85);pointer-events:none;letter-spacing:.2px}
+  /* progress dots — bottom-center under narration */
+  #dots{position:fixed;left:50%;bottom:30px;z-index:3;transform:translateX(-50%);
+    display:flex;gap:7px;pointer-events:none}
+  #dots i{width:7px;height:7px;border-radius:50%;background:rgba(140,180,240,.25);
+    transition:background .4s,box-shadow .4s}
+  #dots i.on{background:var(--amber);box-shadow:0 0 8px var(--amber-glow)}
+  #dots i.done{background:var(--ink-dim)}
 
-  /* canon-confidence chips (inline HTML in narration_en) */
-  .cc { padding:2px 7px; border-radius:3px; font-size:0.75em;
-      font-weight:700; margin-right:6px; letter-spacing:0.05em; }
-  .cc.canon   { background:#1b5e20; color:#fff; }
-  .cc.variant { background:#e65100; color:#fff; }
-  .cc.supp    { background:#1a237e; color:#fff; }
-  .cc.staging { background:#4a148c; color:#fff; }
+  /* control hint — top-right, hidden by `h` */
+  #hint{position:fixed;right:18px;top:18px;z-index:3;font:400 11px/1.6 var(--mono);
+    color:var(--ink-dim);letter-spacing:.04em;pointer-events:none;text-align:right;
+    text-shadow:0 1px 3px #000}
+  #hint b{color:var(--ink);font-weight:600}
 
-  #scene canvas { background: transparent !important; }
+  /* creator credit — REQUIRED on every deploy; stays visible when `h` is pressed */
+  #credit{position:fixed;right:16px;bottom:12px;z-index:4;
+    font:500 11px/1.4 var(--mono);letter-spacing:.05em;
+    color:var(--ink-dim);text-shadow:0 1px 3px #000}
+  #credit a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--edge);
+    pointer-events:auto;transition:color .2s,border-color .2s}
+  #credit a:hover{color:var(--amber);border-color:var(--amber)}
 
-  #caption{position:fixed;z-index:5;left:50%;bottom:78px;transform:translateX(-50%) translateY(14px);
-    width:min(760px,92vw);text-align:center;opacity:0;transition:opacity .7s,transform .7s;pointer-events:none}
-  #caption.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  #caption .date{font-family:var(--mono);font-size:12px;letter-spacing:3px;color:var(--accent)}
-  #caption .ttl{font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:2px;color:#f6efda;
-    margin:3px 0 2px;text-shadow:0 2px 16px #000,0 0 30px rgba(0,0,0,.8)}
-  #caption .ttl .en{display:block;font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:2px;color:var(--ink-dim);margin-top:3px}
-  #caption .narr{font-family:var(--font-display);font-size:14.5px;line-height:1.6;color:#f0e7d2;max-width:680px;margin:6px auto 0;
-    text-shadow:0 1px 3px #000,0 0 6px #000,0 0 14px rgba(0,0,0,.9)}
-  #caption .narr .nz{display:block}
-  #caption .narr .ne{display:block;font-family:var(--mono);font-size:11.5px;font-style:italic;color:#ded4b8;opacity:.92;margin-top:3px;letter-spacing:.3px}
-  #caption .meta{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:9px;flex-wrap:wrap}
-  #caption .cmd{font-family:var(--mono);font-size:11px;color:#f0e4c4;border:1px solid var(--panel-edge);
-    background:rgba(12,15,21,.5);border-radius:20px;padding:3px 11px}
-  #caption .str{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--ink-dim)}
-  #caption .str .bar{width:90px;height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
-  #caption .str .bar > i{display:block;height:100%}
-
-  #controls{position:fixed;z-index:6;left:50%;bottom:32px;transform:translateX(-50%);
-    display:flex;align-items:center;gap:14px;width:min(760px,92vw);transition:opacity .5s}
-  #controls.hide{opacity:0}
-  #play{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:1px solid var(--panel-edge);
-    background:var(--panel);color:var(--accent);font-size:16px;cursor:pointer;backdrop-filter:blur(6px);transition:.18s}
-  #play:hover{background:rgba(216,192,138,.22)}
-  #prog{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.12);position:relative;cursor:pointer}
-  #prog > i{display:block;height:100%;width:0;border-radius:3px;transition:width .4s linear}
-  #prog .beats{position:absolute;inset:0;pointer-events:none}
-  #prog .beats b{position:absolute;top:-3px;width:2px;height:11px;background:rgba(255,255,255,.34);transform:translateX(-50%);border-radius:1px;pointer-events:auto;cursor:pointer}
-  #prog .beats b:hover{background:var(--accent);width:3px}
-  #scene-label{flex:0 0 auto;font-family:var(--mono);font-size:10px;color:var(--ink-dim);min-width:42px;text-align:right}
-
-  #resume{position:fixed;z-index:7;left:50%;top:24px;transform:translateX(-50%);display:none;
-    font-family:var(--font-display);font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--accent);
-    border-radius:22px;padding:8px 18px;cursor:pointer;backdrop-filter:blur(6px);box-shadow:0 6px 22px rgba(0,0,0,.5)}
-  #resume.show{display:block}
-  #resume:hover{background:rgba(216,192,138,.2)}
-
-  #notes{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9;width:min(620px,92vw);max-height:78vh;
-    display:none;flex-direction:column;overflow:hidden}
-  #notes.open{display:flex}
-  #notes .nhd{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;
-    border-bottom:1px solid var(--panel-edge);font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--accent)}
-  #notes .nhd button{background:none;border:none;color:var(--ink-dim);font-size:15px;cursor:pointer}
-  #notes .nbody{padding:14px 17px;overflow:auto;font-size:12.5px;line-height:1.65;color:var(--ink-dim)}
-  #notes .nbody p{margin-bottom:9px}
-  #notes .nbody h5{font-family:var(--font-display);font-size:13px;color:var(--accent);margin:13px 0 6px}
-  #notes .nbody ul{margin:0 0 6px 2px;list-style:none}
-  #notes .nbody li{position:relative;padding-inline-start:15px;margin-bottom:7px}
-  #notes .nbody li::before{content:"▸";position:absolute;inset-inline-start:0;color:var(--accent)}
-
-  /* canon-confidence key in the Notes panel */
-  #notes .cc-key{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}
-  #notes .cc-key .cc{font-size:10px;padding:2px 7px}
-
-  #hint{font-family:var(--mono);font-size:10px;color:var(--ink-dim);pointer-events:none;
-    background:var(--panel);border:1px solid var(--panel-edge);border-radius:8px;padding:6px 10px;max-width:200px;line-height:1.5;transition:opacity .5s}
-  #hint.hide{opacity:0}
-  #hint b{color:var(--accent)}
-
-  #boot{position:fixed;inset:0;z-index:50;background:radial-gradient(ellipse at center,#000010,#000005);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .8s}
+  #boot{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;
+    background:var(--void);color:var(--ink-dim);font:400 12px/1.6 var(--mono);letter-spacing:.18em;
+    text-transform:uppercase;transition:opacity .6s ease}
   #boot.gone{opacity:0;pointer-events:none}
-  #boot .bt{font-family:var(--font-display);font-size:30px;letter-spacing:7px;color:#f4ecd6}
-  #boot .bs{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--accent)}
-  #boot .bar{width:240px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
-  #boot .bar>i{display:block;height:100%;width:30%;background:var(--accent);animation:load 1.1s ease-in-out infinite}
-  @keyframes load{0%{margin-left:-30%}100%{margin-left:100%}}
-  #boot .msg{font-family:var(--mono);font-size:10px;color:var(--ink-dim)}
-  #err{position:fixed;inset:0;z-index:60;background:#1a0d0d;color:#ffd9d2;font-family:var(--mono);font-size:13px;padding:40px;display:none;white-space:pre-wrap;overflow:auto}
-
-  @media (max-width:600px){
-    #title h1{font-size:17px} #caption .ttl{font-size:22px} #caption .narr{font-size:13px}
-    #hud-tl{max-width:54vw} #key{max-width:46vw;font-size:10px;top:10px;right:10px;padding:6px 9px}
-    #caption .narr .ne{font-size:10.5px}
-    #credit{font-size:8px;bottom:3px} #title .credit{font-size:8px}
-  }
-  @media (max-width:440px){
-    #title{padding:6px 9px 7px}
-    #title h1{font-size:15px;letter-spacing:1.5px}
-    #title .sub{font-size:7px;letter-spacing:1px;margin-top:2px}
-    #notes-btn,#lang-btn{font-size:8px;margin-top:5px}
-    #title .credit{font-size:7px;margin-top:5px;max-width:165px;line-height:1.35}
-    #hud-tl{max-width:48vw} #key{max-width:42vw;font-size:8px;top:10px;right:8px;padding:5px 6px}
-    #resume{top:112px}
-  }
 </style>
 </head>
 <body>
-  <canvas id="space-bg" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;"></canvas>
   <div id="scene"></div>
-  <div id="lower-scrim"></div>
-  <div id="labels"></div>
 
-  <div id="hud-tl">
-    <div id="title" class="panel">
-      <h1></h1>
-      <div class="sub" lang="en"></div>
-      <button id="notes-btn"></button>
-      <button id="lang-btn" aria-label="Toggle narration language"></button>
-      <button id="music-btn" class="off" title="Music" aria-label="Background music">🔇</button>
-      <div class="credit"><a href="https://github.com/keithligh/cinematic-3d-battle-engine" target="_blank" rel="noopener">cinematic-3d-battle-engine</a> by Keith Li (MIT)</div>
-    </div>
-    <div id="disclaimer"></div>
-    <div id="hint" class="panel"></div>
+  <div id="act" class="overlay"></div>
+
+  <div id="hint" class="overlay">
+    <b>SPACE</b> 暫停／播放 &nbsp;·&nbsp; <b>← →</b> 切幕 &nbsp;·&nbsp; <b>H</b> 隱藏介面
   </div>
 
-  <div id="key" class="panel"></div>
+  <div id="narr" class="overlay"><span id="cc"></span><span id="ntxt"></span></div>
+  <div id="dots" class="overlay"></div>
 
-  <div id="caption">
-    <div class="date" id="cap-date"></div>
-    <div class="ttl" id="cap-title"></div>
-    <div class="narr" id="cap-narr"></div>
-    <div class="meta" id="cap-meta"></div>
-  </div>
+  <div id="credit"><a href="https://www.linkedin.com/in/icomppower/" target="_blank" rel="noopener">Built by Johnny Lai · icomppower</a></div>
 
-  <div id="credit" lang="en">Built by <a href="https://www.linkedin.com/in/icomppower/" target="_blank" rel="noopener">Johnny Lai</a></div>
+  <div id="boot">Initialising void…</div>
 
-  <div id="controls">
-    <button id="play" title="Play / pause" aria-label="Play / pause">⏸</button>
-    <div id="prog" role="progressbar" aria-label="Tour progress"><i></i><div class="beats" id="prog-beats"></div></div>
-    <div id="scene-label"></div>
-  </div>
+<!-- Three.js r128, single script from cdnjs (no bundler, no build step) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================================
+ * 所羅門攻略戰 · BATTLE OF SOLOMON · U.C. 0079
+ * Single-file 3D space documentary — built on icomppower/space-engine.
+ * ----------------------------------------------------------------------------
+ * Real star sphere · nebula · sun · distant Earth/Luna backdrop · Solomon
+ * asteroid fortress as scene origin [0,0,0]. A SCENES[] player auto-plays 10
+ * acts: per-scene camera tween (2.4s) + hold, multi-unit keyframe tracks,
+ * st:dead vaporise FX, Solar System beam, faction colours + emblems, CC chips.
+ * No external assets · no build step · no 2D map · no timeline scrubber.
+ * ==========================================================================*/
 
-  <div id="resume"></div>
+/* ---------------------------------------------------------------- CFG ----- */
+const CFG = {
+  starCount : 9000,
+  starShell : [6200, 9600],
+  sunDir    : [1.0, 0.34, 0.55],
+  // distant backdrop (dim, small, never steals the frame — battle is the subject)
+  earthPos  : [-1700, -260, -2500], earthSize: 80,
+  moonPos   : [-2050, -120, -2750], moonSize : 24,
+};
 
-  <div id="notes" class="panel">
-    <div class="nhd"><span></span><button id="notes-close" aria-label="Close">✕</button></div>
-    <div id="notes-body" class="nbody">
-      <div class="cc-key">
-        <span class="cc canon">CANON</span> On-screen TV series &nbsp;
-        <span class="cc variant">VARIANT</span> Differs by adaptation &nbsp;
-        <span class="cc supp">SUPPLEMENTARY</span> Guidebook/illustrative &nbsp;
-        <span class="cc staging">STAGING</span> This production's placement
-      </div>
-    </div>
-  </div>
+/* ----------------------------------------- factions (colour + emblem) ----- */
+const FACTION = {
+  eff:  { hull:0x8c98a8, light:0x9fd0ff, core:0x9fd0ff, emblem:'EFF'  }, // 聯邦 — 冷藍鋼
+  zeon: { hull:0x6b6258, light:0xffb63c, core:0xffc861, emblem:'ZEON' }, // 吉翁 — 暖綠／金
+};
+function rgbStr(hex){ const c=new THREE.Color(hex); return `${(c.r*255)|0},${(c.g*255)|0},${(c.b*255)|0}`; }
+for(const k in FACTION){ FACTION[k].ls = rgbStr(FACTION[k].light); FACTION[k].hs = rgbStr(FACTION[k].hull); }
 
-  <!-- Music: Space Opera Prelude: The Void — committed to lib/ -->
-  <audio id="bgm" loop muted preload="auto" src="lib/Space Opera Prelude_ The Void.mp3"></audio>
+/* --------------------------------------------------------- tiny utils ----- */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// radial-gradient sprite from a fresh canvas (one-offs: sun, nebula, fortress core)
+function radialSprite(stops, size, opacity){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(128,128,0, 128,128,128);
+  stops.forEach(([o, col]) => g.addColorStop(o, col));
+  ctx.fillStyle = g; ctx.fillRect(0,0,256,256);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const sp = new THREE.Sprite(mat); sp.scale.set(size, size, 1);
+  return sp;
+}
+// cached radial textures (re-used every frame for trails / explosions / engine glow)
+const _texCache = {};
+function glowTex(key, stops){
+  if(_texCache[key]) return _texCache[key];
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,0, 64,64,64);
+  stops.forEach(([o,col]) => g.addColorStop(o,col));
+  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+  const tex = new THREE.CanvasTexture(c); tex._shared = true; _texCache[key] = tex;
+  return tex;
+}
+function makeSprite(tex, size, opacity){
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const sp = new THREE.Sprite(mat); sp.scale.set(size, size, 1);
+  return sp;
+}
 
-  <div id="boot">
-    <div class="bt"></div>
-    <div class="bs"></div>
-    <div class="bar"><i></i></div>
-    <div class="msg" id="boot-msg"></div>
-  </div>
-  <pre id="err"></pre>
+/* ========================================================== 1 · RENDERER == */
+const sceneEl = document.getElementById('scene');
+const scene   = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setClearColor(0x000308, 1);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+sceneEl.appendChild(renderer.domElement);
 
-  <script src="lib/three.min.js"></script>
-  <script src="lib/OrbitControls.js"></script>
-  <script src="lib/CSS2DRenderer.js"></script>
-  <script src="data.js"></script>
-  <script type="module" src="app.js"></script>
-  <script type="module">
-    import { initSpaceRenderer } from './lib/space-renderer.js';
-    window.addEventListener('DOMContentLoaded', initSpaceRenderer);
-  </script>
+const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 1, 40000);
+const sunDir = new THREE.Vector3(...CFG.sunDir).normalize();
+
+/* ========================================================= 2 · STAR FIELD = */
+function buildStars(){
+  const n = CFG.starCount, [inner, outer] = CFG.starShell;
+  const pos=new Float32Array(n*3), col=new Float32Array(n*3),
+        size=new Float32Array(n), phase=new Float32Array(n);
+  const rnd = mulberry32(90791), c = new THREE.Color();
+  for(let i=0;i<n;i++){
+    const u = rnd()*2-1, th = rnd()*Math.PI*2, s = Math.sqrt(1-u*u);
+    const r = inner + rnd()*(outer-inner);
+    pos[i*3]=r*s*Math.cos(th); pos[i*3+1]=r*u; pos[i*3+2]=r*s*Math.sin(th);
+    const t = rnd();
+    const hue = t<0.12 ? 0.58 : (t>0.90 ? 0.07 : 0.6);
+    const sat = t<0.12||t>0.90 ? 0.5 : 0.06;
+    c.setHSL(hue, sat, 0.55 + rnd()*0.45);
+    col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+    size[i]=(rnd()*rnd())*7+1.4; phase[i]=rnd();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col,3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(size,1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(phase,1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{ uTime:{value:0}, uPix:{value:renderer.getPixelRatio()} },
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, vertexColors:true,
+    vertexShader:`attribute float aSize; attribute float aPhase; varying vec3 vColor;
+      uniform float uTime; uniform float uPix;
+      void main(){ vColor=color;
+        float tw=0.65+0.35*sin(uTime*1.7+aPhase*6.2831853);
+        vec4 mv=modelViewMatrix*vec4(position,1.0);
+        gl_PointSize=aSize*tw*uPix*(340.0/-mv.z);
+        gl_Position=projectionMatrix*mv; }`,
+    fragmentShader:`varying vec3 vColor;
+      void main(){ float d=length(gl_PointCoord-vec2(0.5));
+        float a=smoothstep(0.5,0.0,d); gl_FragColor=vec4(vColor,a*a); }`,
+  });
+  const stars = new THREE.Points(geo, mat); stars.frustumCulled = false;
+  scene.add(stars); return mat;
+}
+const starMat = buildStars();
+
+/* ============================================================ 3 · NEBULA == */
+(function(){
+  const neb = new THREE.Group();
+  [ { col:'rgba(60,90,200,',  pos:[-1800,600,-3200], size:5200, op:0.10 },
+    { col:'rgba(170,60,150,', pos:[2400,-900,-2600], size:4200, op:0.08 },
+    { col:'rgba(40,140,170,', pos:[-800,-1400,2800], size:4600, op:0.07 },
+  ].forEach(c=>{ const sp=radialSprite([[0,c.col+'1)'],[0.5,c.col+'0.25)'],[1,c.col+'0)']],c.size,c.op);
+    sp.position.set(...c.pos); neb.add(sp); });
+  scene.add(neb);
+})();
+
+/* =============================================================== 4 · SUN == */
+const sunLight = new THREE.DirectionalLight(0xfff2dd, 2.2);
+sunLight.position.copy(sunDir).multiplyScalar(4000); scene.add(sunLight);
+scene.add(new THREE.AmbientLight(0x223044, 0.6));
+(function(){
+  const g = new THREE.Group(); g.position.copy(sunDir.clone().multiplyScalar(7000));
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(120,24,24), new THREE.MeshBasicMaterial({color:0xfff6e6})));
+  g.add(radialSprite([[0,'rgba(255,250,235,1)'],[0.25,'rgba(255,225,160,0.7)'],[1,'rgba(255,180,90,0)']],2600,0.9));
+  scene.add(g);
+})();
+
+/* ============================================ 5 · distant Earth / Luna ===== */
+function earthTexture(seed){
+  const W=1024,H=512,c=document.createElement('canvas'); c.width=W;c.height=H;
+  const ctx=c.getContext('2d'), rnd=mulberry32(seed);
+  const og=ctx.createLinearGradient(0,0,0,H);
+  og.addColorStop(0,'#0a2236'); og.addColorStop(0.5,'#0e3a5c'); og.addColorStop(1,'#0a2236');
+  ctx.fillStyle=og; ctx.fillRect(0,0,W,H);
+  const land=['#2f6b3a','#3c7a44','#6b7a3c','#8a7a4e','#4a6b3a'];
+  for(let k=0;k<10;k++){
+    const cx=rnd()*W, cy=H*0.18+rnd()*H*0.64, blobs=30+(rnd()*40|0);
+    for(let b=0;b<blobs;b++){
+      const ang=rnd()*Math.PI*2, dist=Math.pow(rnd(),0.6)*(70+rnd()*120);
+      const x=cx+Math.cos(ang)*dist, y=cy+Math.sin(ang)*dist*0.6, r=14+rnd()*46;
+      const col=land[(rnd()*land.length)|0], g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,col); g.addColorStop(0.7,col); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.globalAlpha=0.85; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1; return new THREE.CanvasTexture(c);
+}
+const earth = new THREE.Group();
+earth.add(new THREE.Mesh(new THREE.SphereGeometry(CFG.earthSize,48,36),
+  new THREE.MeshPhongMaterial({ map:earthTexture(1337), shininess:6, specular:0x10283c })));
+earth.add(new THREE.Mesh(new THREE.SphereGeometry(CFG.earthSize*1.06,48,36),
+  new THREE.MeshBasicMaterial({ color:0x183a64, transparent:true, opacity:0.25,
+    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide })));
+earth.position.set(...CFG.earthPos); scene.add(earth);
+(function(){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(CFG.moonSize,32,24),
+    new THREE.MeshPhongMaterial({color:0x8f8f88, shininess:2}));
+  m.position.set(...CFG.moonPos); scene.add(m);
+})();
+
+/* ============================================== 6 · buildFortress() factory ==
+ * Solomon = displaced octahedron asteroid + gold trench lights + reactor core.
+ * Core mesh is tagged 'reactorCore' so S10 can swap Zeon→EFF on capture.       */
+function buildFortress({ size, elongate=1, seed=7, color=0x8f8265, emissive=0x1c160c, coreColor=0xffc861 }){
+  const group = new THREE.Group(), rnd = mulberry32(seed);
+  const geo = new THREE.OctahedronGeometry(size,3), p = geo.attributes.position, v = new THREE.Vector3();
+  for(let i=0;i<p.count;i++){ v.fromBufferAttribute(p,i); v.multiplyScalar(0.72+rnd()*0.6); v.y*=elongate; p.setXYZ(i,v.x,v.y,v.z); }
+  geo.computeVertexNormals();
+  group.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color, emissive, emissiveIntensity:0.4, roughness:0.95, metalness:0.08, flatShading:true })));
+  const nL=90, lp=new Float32Array(nL*3);
+  for(let i=0;i<nL;i++){ const idx=(rnd()*p.count)|0; v.fromBufferAttribute(p,idx).multiplyScalar(1.02); lp[i*3]=v.x;lp[i*3+1]=v.y;lp[i*3+2]=v.z; }
+  const lgeo=new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lp,3));
+  group.add(new THREE.Points(lgeo, new THREE.PointsMaterial({ color:0xffd27a, size:Math.max(0.6,size*0.07),
+    transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false })));
+  const core = new THREE.Mesh(new THREE.SphereGeometry(size*0.16,16,16), new THREE.MeshBasicMaterial({color:coreColor}));
+  core.name='reactorCore'; group.add(core);
+  const glow = radialSprite([[0,`rgba(${rgbStr(coreColor)},1)`],[0.4,`rgba(${rgbStr(coreColor)},0.5)`],[1,`rgba(${rgbStr(coreColor)},0)`]], size*4.2, 0.85);
+  glow.name='coreGlow'; group.add(glow);
+  return group;
+}
+
+/* ====================================================== 7 · unit builders == */
+function shipMesh(F, scale){
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.ConeGeometry(1.3*scale, 5*scale, 8),
+    new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.45, metalness:0.65,
+      emissive:F.hull, emissiveIntensity:0.06 }));
+  hull.rotation.x = Math.PI/2;          // point along +Z (travel direction)
+  g.add(hull);
+  const glow = makeSprite(glowTex('engine-'+F.emblem, [[0,`rgba(${F.ls},1)`],[1,`rgba(${F.ls},0)`]]), 5.5*scale, 0.85);
+  glow.position.set(0,0,-3*scale); g.add(glow);
+  return g;
+}
+function buildFleet(F, count, scale){
+  const g = new THREE.Group(), rnd = mulberry32(count*131 + (F.hull&0xff));
+  for(let i=0;i<count;i++){
+    const s = shipMesh(F, scale);
+    s.position.set((rnd()-0.5)*18*scale, (rnd()-0.5)*7*scale, (rnd()-0.5)*18*scale);
+    s.rotation.y = (rnd()-0.5)*0.5;
+    g.add(s);
+  }
+  return g;
+}
+function emblemSprite(F){
+  const c=document.createElement('canvas'); c.width=c.height=128; const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,128,128);
+  const col = F.emblem==='EFF' ? '#9fd0ff' : '#ffb63c';
+  ctx.strokeStyle=col; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(64,64,40,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle=col; ctx.font='bold 30px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(F.emblem, 64, 66);
+  const tex=new THREE.CanvasTexture(c);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.95,depthWrite:false}));
+  sp.scale.set(9,9,1); sp.name='emblem'; return sp;
+}
+function buildSolarArray(){
+  const g = new THREE.Group();
+  const panelMat = new THREE.MeshStandardMaterial({ color:0x6a7a8c, roughness:0.3, metalness:0.85,
+    side:THREE.DoubleSide, emissive:0x14304a, emissiveIntensity:0.3 });
+  for(let i=0;i<5;i++){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(20,13), panelMat);
+    p.position.set((i-2)*15, (i%2)*5-2, 0); p.rotation.set(0,-0.4,0.06);
+    g.add(p);
+  }
+  const core = makeSprite(glowTex('solar', [[0,'rgba(190,235,255,1)'],[0.4,'rgba(120,190,255,0.5)'],[1,'rgba(120,190,255,0)']]), 46, 0.0);
+  core.name='charge'; g.add(core);
+  g.userData.solar = true;
+  return g;
+}
+function buildUnit(u){
+  const F = FACTION[u.faction];
+  switch(u.kind){
+    case 'fortress': {
+      const f = buildFortress({ size:40, elongate:1.15, seed:7,
+        color:F.hull, coreColor:F.core });
+      return f;
+    }
+    case 'fleet':   return buildFleet(F, 6, 1);
+    case 'command': { const c = buildFleet(F, 1, 2.4); c.add(emblemSprite(F)); return c; }
+    case 'ms':      return shipMesh(F, 0.85);
+    case 'hero-ms': { const m = shipMesh(F, 1.15); m.userData.hero = true; return m; }
+    case 'artillery': return buildSolarArray();
+  }
+  return new THREE.Group();
+}
+
+/* ============================================================ 8 · SCENES == */
+/* Coordinates are the Scene Script 3D xyz tables. Solomon = origin [0,0,0].
+ * Y depth layers: fortress/fleet/command≈0 · ms≈18 · hero-ms≈24 · artillery≈40. */
+const SCENES = [
+  { id:'S1', title:'序幕 — 要塞的沉默', hold:20, cc:['CANON'],
+    narr:'奧德薩之後，吉翁全面收縮宇宙；所羅門是最後防線之一。雷比爾將軍集結艦隊，矛頭直指要塞。',
+    cam:{ pos:[130,75,150], look:[0,5,0] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Zeon 巡邏 MS', kind:'ms', faction:'zeon', track:[[36,18,36],[-36,18,-36],[0,18,36]] },
+      { n:'聯邦偵察機', kind:'ms', faction:'eff', track:[[132,18,132],[-144,18,-132]] },
+    ] },
+  { id:'S2', title:'聯邦集結', hold:18, cc:['CANON','VARIANT'],
+    narr:'第一、第二聯合艦隊兩翼包抄逼近，白色基地隨隊推進；道森提督啟動所羅門防禦配置。',
+    cam:{ pos:[185,80,120], look:[10,5,-10] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'第一聯合艦隊', kind:'fleet', faction:'eff', track:[[132,0,0],[60,0,0]] },
+      { n:'第一艦隊 MS隊', kind:'ms', faction:'eff', track:[[120,18,36],[48,18,36]] },
+      { n:'第二聯合艦隊', kind:'fleet', faction:'eff', track:[[-132,0,-132],[-60,0,-60]] },
+      { n:'白色基地', kind:'command', faction:'eff', track:[[-120,0,-96],[-48,0,-36]] },
+      { n:'Zeon 警戒線', kind:'ms', faction:'zeon', track:[[48,18,0],[72,18,0]] },
+    ] },
+  { id:'S3', title:'第一波接觸', hold:16, cc:['CANON','SUPP'],
+    narr:'吉翁 MS 由要塞東、北面出擊，聯邦前鋒接敵，首批交火爆發。',
+    cam:{ pos:[150,55,110], look:[50,15,15] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[0,18,84],[24,18,60]] },
+      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[60,18,0],[84,18,0]] },
+      { n:'聯邦前鋒 MS', kind:'ms', faction:'eff', track:[[96,18,36],[48,18,24]], dead:true, deadDelay:0.7 },
+      { n:'聯邦前鋒艦', kind:'fleet', faction:'eff', track:[[108,0,0],[60,0,0]] },
+    ] },
+  { id:'S4', title:'防禦圈全面激活', hold:16, cc:['CANON'],
+    narr:'南圈 MS 加入，多層防禦圈成形；兩翼聯邦艦隊同步施壓，戰線全面拉開。',
+    cam:{ pos:[40,115,165], look:[0,8,0] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', track:[[0,18,-84],[-24,18,-60]] },
+      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[24,18,60],[36,18,48]] },
+      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[84,18,0],[96,18,0]] },
+      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[60,0,0],[48,0,0]] },
+      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-60,0,-60],[-48,0,-48]] },
+      { n:'白色基地', kind:'command', faction:'eff', track:[[-48,0,-36],[-36,0,-24]] },
+    ] },
+  { id:'S5', title:'太陽系統展開', hold:15, cc:['CANON'],
+    narr:'聯邦巨型反射砲陣列「太陽系統」於高側翼展開充能，戰場短暫陷入靜默。',
+    cam:{ pos:[205,95,205], look:[70,28,70] },
+    units:[
+      { n:'太陽系統陣列', kind:'artillery', faction:'eff', at:[144,40,132] },
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[96,18,0],[100,18,0]] },
+      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[36,18,48],[40,18,44]] },
+      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', track:[[-24,18,-60],[-20,18,-56]] },
+      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[48,0,0],[46,0,0]] },
+      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-48,0,-48],[-46,0,-46]] },
+    ] },
+  { id:'S6', title:'太陽系統發動', hold:22, cc:['CANON'], beam:true,
+    narr:'光束橫掃，吉翁外圈 MS 由外至內逐批蒸發；所羅門防線在數秒間崩潰。',
+    cam:{ pos:[195,75,55], look:[50,18,25] },
+    units:[
+      { n:'太陽系統陣列', kind:'artillery', faction:'eff', at:[144,40,132], fire:true },
+      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', at:[100,18,0], dead:true, deadDelay:0.30 },
+      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', at:[40,18,44], dead:true, deadDelay:0.45 },
+      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', at:[-20,18,-56], dead:true, deadDelay:0.62 },
+      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[46,0,0],[36,0,0]] },
+      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-46,0,-46],[-36,0,-36]] },
+    ] },
+  { id:'S7', title:'防線崩潰突破', hold:16, cc:['CANON'],
+    narr:'聯邦乘勢突入要塞外圍，白色基地衝向側翼，吉翁殘兵後退收縮。',
+    cam:{ pos:[95,65,135], look:[-15,10,15] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[24,0,0],[-12,0,0]] },
+      { n:'聯邦第一 MS隊', kind:'ms', faction:'eff', track:[[36,18,36],[-12,18,60]] },
+      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-36,0,-36],[-24,0,-12]] },
+      { n:'白色基地', kind:'command', faction:'eff', track:[[-48,0,-36],[-24,0,12]] },
+      { n:'Zeon 殘兵', kind:'ms', faction:'zeon', track:[[48,18,0],[12,18,0]] },
+      { n:'Zeon 殘艦', kind:'fleet', faction:'zeon', track:[[36,0,-12],[12,0,-12]] },
+    ] },
+  { id:'S8', title:'Elmeth 出擊與殞落', hold:25, cc:['CANON'],
+    narr:'拉拉蘇駕 Elmeth 高速孤線掠出，鋼彈截擊；新人類的感應，在死亡邊緣初次共鳴。',
+    cam:{ pos:[30,55,150], look:[45,22,75] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Elmeth（拉拉蘇）', kind:'hero-ms', faction:'zeon', track:[[-24,24,36],[96,24,108]], dead:true, deadDelay:0.92 },
+      { n:'鋼彈（阿姆羅）', kind:'hero-ms', faction:'eff', track:[[0,24,60],[60,24,84]] },
+      { n:'聯邦主艦隊', kind:'fleet', faction:'eff', track:[[-12,0,0],[-18,0,0]] },
+      { n:'Zeon 守備 MS', kind:'ms', faction:'zeon', track:[[12,18,12],[12,18,0]] },
+    ] },
+  { id:'S9', title:'ドズル最後一戰', hold:20, cc:['CANON'],
+    narr:'道森乘 Big Zam 單騎出擊，掩護艦隊撤退；聯邦集火之下，巨人戰死陣前。',
+    cam:{ pos:[100,42,95], look:[25,8,14] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
+      { n:'Big Zam', kind:'command', faction:'zeon', track:[[0,6,12],[36,6,12],[48,6,12]], dead:true, deadDelay:0.9 },
+      { n:'聯邦前鋒艦 A', kind:'fleet', faction:'eff', at:[12,0,12], dead:true, deadDelay:0.5 },
+      { n:'聯邦前鋒艦 B', kind:'fleet', faction:'eff', at:[24,0,24], dead:true, deadDelay:0.62 },
+      { n:'聯邦 MS 反擊', kind:'ms', faction:'eff', track:[[24,18,36],[36,18,24]] },
+    ] },
+  { id:'S10', title:'所羅門陷落', hold:18, cc:['CANON'],
+    narr:'要塞易手，改名「コンペイトウ」。吉翁殘艦向暗處逃逸，聯邦兵鋒已指向 A Baoa Qu。',
+    cam:{ pos:[145,82,160], look:[0,5,0] },
+    units:[
+      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0], capture:true },
+      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[-18,0,0],[-24,0,0]] },
+      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-24,0,-12],[-12,0,-24]] },
+      { n:'聯邦 MS 佔領隊', kind:'ms', faction:'eff', track:[[-12,18,24],[0,18,24]] },
+      { n:'Zeon 撤退艦 A', kind:'fleet', faction:'zeon', track:[[12,0,0],[-132,0,-144]] },
+      { n:'Zeon 撤退艦 B', kind:'fleet', faction:'zeon', track:[[-12,0,-12],[-144,0,-120]] },
+    ] },
+];
+
+/* ====================================================== 9 · FX (pooled) ==== */
+const stage = new THREE.Group(); scene.add(stage);
+const fxList = [], beamList = [], trailList = [];
+
+function disposeObj(o){
+  o.traverse(n=>{
+    if(n.geometry) n.geometry.dispose();
+    if(n.material){ const arr = Array.isArray(n.material) ? n.material : [n.material];
+      arr.forEach(m=>{ if(m.map && !m.map._shared) m.map.dispose(); m.dispose(); }); }
+  });
+}
+function spawnExplosion(pos, faction){
+  const sp = makeSprite(glowTex('boom', [[0,'rgba(255,244,210,1)'],[0.3,'rgba(255,170,80,0.85)'],[1,'rgba(255,120,40,0)']]), 5, 1);
+  sp.position.copy(pos); stage.add(sp);
+  fxList.push({ sp, t:0, life:1.1, max:40 });
+  // debris sparks
+  const sk = makeSprite(glowTex('spark', [[0,'rgba(255,230,180,1)'],[1,'rgba(255,180,90,0)']]), 2, 0.9);
+  sk.position.copy(pos); stage.add(sk);
+  fxList.push({ sp:sk, t:0, life:0.6, max:14 });
+}
+function spawnBeam(from, to){
+  const dir = new THREE.Vector3().subVectors(to, from), len = dir.length();
+  const geo = new THREE.CylinderGeometry(1.8, 1.8, len, 8, 1, true);
+  const mat = new THREE.MeshBasicMaterial({ color:0xddf2ff, transparent:true, opacity:0,
+    blending:THREE.AdditiveBlending, depthWrite:false });
+  const beam = new THREE.Mesh(geo, mat);
+  beam.position.copy(from).add(to).multiplyScalar(0.5);
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  stage.add(beam); beamList.push({ beam, mat, t:0, life:1.6 });
+}
+function updateFx(dt){
+  for(let i=fxList.length-1;i>=0;i--){ const f=fxList[i]; f.t+=dt; const k=f.t/f.life;
+    if(k>=1){ stage.remove(f.sp); disposeObj(f.sp); fxList.splice(i,1); continue; }
+    const s=5+k*f.max; f.sp.scale.set(s,s,1); f.sp.material.opacity=1-k; }
+  for(let i=beamList.length-1;i>=0;i--){ const b=beamList[i]; b.t+=dt; const k=b.t/b.life;
+    if(k>=1){ stage.remove(b.beam); disposeObj(b.beam); beamList.splice(i,1); continue; }
+    b.mat.opacity=Math.sin(Math.min(k,1)*Math.PI)*0.9; }
+  for(let i=trailList.length-1;i>=0;i--){ const tr=trailList[i]; tr.t+=dt; const k=tr.t/tr.life;
+    if(k>=1){ stage.remove(tr.sp); trailList.splice(i,1); continue; }
+    tr.sp.material.opacity=(1-k)*0.5; tr.sp.scale.setScalar(5*(1-k*0.5)); }
+}
+
+/* ================================================== 10 · SCENES PLAYER ===== */
+const overlay = { act:document.getElementById('act'), cc:document.getElementById('cc'),
+  ntxt:document.getElementById('ntxt'), dots:document.getElementById('dots') };
+const CCMAP = { CANON:'canon', VARIANT:'variant', SUPP:'supp', STAGING:'staging' };
+// progress dots
+SCENES.forEach(()=>{ const i=document.createElement('i'); overlay.dots.appendChild(i); });
+
+let si = -1, phase = 0, paused = false;
+const camFrom = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
+const camTo   = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
+const curLook = new THREE.Vector3();
+let liveUnits = [], sceneArrayPos = null;
+
+function easeIO(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
+function dur(S){ return 2.4 + S.hold; }
+
+function clearStage(){
+  for(let i=stage.children.length-1;i>=0;i--){ const c=stage.children[i]; stage.remove(c); disposeObj(c); }
+  liveUnits.length=0; fxList.length=0; beamList.length=0; trailList.length=0;
+}
+function setOverlay(S, idx){
+  overlay.act.innerHTML = `<span class="n">${S.id} / ${SCENES.length}</span>${S.title}`;
+  overlay.cc.innerHTML = S.cc.map(c=>`<span class="cc ${CCMAP[c]}">${c}</span>`).join('');
+  overlay.ntxt.textContent = S.narr;
+  [...overlay.dots.children].forEach((d,i)=>{ d.className = i===idx ? 'on' : (i<idx?'done':''); });
+}
+function enterScene(idx){
+  si = idx; phase = 0;
+  const S = SCENES[idx];
+  clearStage();
+  camFrom.pos.copy(camera.position); camFrom.look.copy(curLook);
+  camTo.pos.set(...S.cam.pos); camTo.look.set(...S.cam.look);
+  sceneArrayPos = null;
+  const D = dur(S);
+  for(const u of S.units){
+    const obj = buildUnit(u);
+    let curve = null, start;
+    if(u.track){
+      const pts = u.track.map(p=>new THREE.Vector3(...p));
+      start = pts[0].clone();
+      if(pts.length>=2){ curve = new THREE.CatmullRomCurve3(pts); curve.curveType='catmullrom'; curve.tension=0.4; }
+    } else { start = new THREE.Vector3(...u.at); }
+    obj.position.copy(start);
+    if(u.kind==='artillery') sceneArrayPos = start.clone();
+    stage.add(obj);
+    liveUnits.push({ u, obj, curve, dead:!!u.dead,
+      deadAt:(u.deadDelay!=null?u.deadDelay:0.85)*D, exploded:false, captured:false });
+  }
+  setOverlay(S, idx);
+}
+
+function playUpdate(dt){
+  if(si<0) return;
+  const S = SCENES[si], D = dur(S);
+  phase += dt;
+  // camera tween over first 2.4s, then hold
+  const e = easeIO(Math.min(1, phase/2.4));
+  camera.position.lerpVectors(camFrom.pos, camTo.pos, e);
+  curLook.lerpVectors(camFrom.look, camTo.look, e);
+  camera.lookAt(curLook);
+  const p = easeIO(Math.min(1, phase/D));
+  for(const lu of liveUnits){
+    if(lu.curve){ lu.curve.getPoint(p, lu.obj.position);
+      // face direction of travel
+      const ahead = lu.curve.getPoint(Math.min(1, p+0.02));
+      if(ahead.distanceToSquared(lu.obj.position)>1e-4) lu.obj.lookAt(ahead);
+    }
+    // solar array charge / fire
+    if(lu.u.kind==='artillery'){
+      const ch = lu.obj.getObjectByName('charge');
+      if(ch) ch.material.opacity = lu.u.fire ? (0.3+0.7*Math.abs(Math.sin(phase*4))) : Math.min(0.6, phase/2.4*0.6);
+    }
+    // hero-ms motion trail
+    if(lu.u.kind==='hero-ms' && lu.obj.visible && lu.curve){
+      const F = FACTION[lu.u.faction];
+      const tr = makeSprite(glowTex('trail-'+F.emblem, [[0,`rgba(${F.ls},0.9)`],[1,`rgba(${F.ls},0)`]]), 5, 0.5);
+      tr.position.copy(lu.obj.position); stage.add(tr); trailList.push({ sp:tr, t:0, life:0.6 });
+    }
+    // st:dead vaporise
+    if(lu.dead && !lu.exploded && phase>=lu.deadAt){
+      lu.exploded = true;
+      if(sceneArrayPos) spawnBeam(sceneArrayPos.clone(), lu.obj.position.clone());
+      spawnExplosion(lu.obj.position.clone(), lu.u.faction);
+      lu.obj.visible = false;
+    }
+    // S10 emblem swap (Zeon → EFF) at mid-hold
+    if(lu.u.capture && !lu.captured && phase > D*0.5){
+      lu.captured = true;
+      const F = FACTION.eff;
+      const core = lu.obj.getObjectByName('reactorCore'); if(core) core.material.color.set(F.core);
+      const glow = lu.obj.getObjectByName('coreGlow'); if(glow) lu.obj.remove(glow);
+      lu.obj.add(emblemSprite(F));
+    }
+  }
+  if(phase >= D) enterScene((si+1) % SCENES.length);
+}
+
+/* ===================================================== 11 · CONTROLS ======= */
+window.addEventListener('keydown', e=>{
+  if(e.key==='h'||e.key==='H') document.body.classList.toggle('bare');
+  else if(e.code==='Space'){ e.preventDefault(); paused=!paused; }
+  else if(e.key==='ArrowRight') enterScene((si+1)%SCENES.length);
+  else if(e.key==='ArrowLeft') enterScene((si-1+SCENES.length)%SCENES.length);
+});
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  starMat.uniforms.uPix.value = renderer.getPixelRatio();
+});
+
+/* ========================================================= 12 · LOOP ======= */
+const clock = new THREE.Clock();
+// opening: start pulled back so S1 tween eases in
+camera.position.set(210, 120, 240); curLook.set(0,0,0); camera.lookAt(curLook);
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  if(!paused) playUpdate(dt);
+  updateFx(dt);
+  earth.rotation.y += dt*0.01;
+  starMat.uniforms.uTime.value = t;
+  renderer.render(scene, camera);
+}
+
+// deep-link to an act via hash (#6 → S6); defaults to opening act
+const startIdx = Math.max(0, Math.min(SCENES.length-1, (parseInt(location.hash.slice(1),10)||1) - 1));
+window.addEventListener('hashchange', ()=>{
+  const i = Math.max(0, Math.min(SCENES.length-1, (parseInt(location.hash.slice(1),10)||1) - 1));
+  enterScene(i);
+});
+
+const boot = document.getElementById('boot');
+requestAnimationFrame(()=>{ enterScene(startIdx); animate(); setTimeout(()=>boot.classList.add('gone'), 400); });
+</script>
 </body>
 </html>
