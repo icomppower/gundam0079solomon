@@ -82,15 +82,15 @@
     color:rgba(228,234,242,0.92);text-shadow:0 1px 2px #000,0 0 4px #000,0 0 9px rgba(0,0,0,.85);pointer-events:none;letter-spacing:.2px}
 
   /* canon-confidence chips (inline HTML in narration_en) */
-  .cc{display:inline-block;font-family:var(--mono);font-size:9px;font-style:normal;letter-spacing:.8px;
-    padding:1px 5px;border-radius:3px;margin-right:4px;vertical-align:middle;font-weight:700}
-  .cc.canon{background:#1a4a1a;color:#7ddf7d;border:1px solid #3a7a3a}
-  .cc.variant{background:#4a3a00;color:#f0c040;border:1px solid #8a6a00}
-  .cc.supp{background:#0d2a4a;color:#7ab4f0;border:1px solid #1a5a9a}
-  .cc.staging{background:#3a1a00;color:#e0904a;border:1px solid #7a4000}
+  .cc { padding:2px 7px; border-radius:3px; font-size:0.75em;
+      font-weight:700; margin-right:6px; letter-spacing:0.05em; }
+  .cc.canon   { background:#1b5e20; color:#fff; }
+  .cc.variant { background:#e65100; color:#fff; }
+  .cc.supp    { background:#1a237e; color:#fff; }
+  .cc.staging { background:#4a148c; color:#fff; }
 
-  /* space: star-field canvas background */
-  canvas { background: radial-gradient(ellipse at center, #0a0a2e 0%, #000005 100%) !important; }
+  canvas { background: radial-gradient(ellipse at center,
+      #0d0d3a 0%, #050510 60%, #000000 100%) !important; }
 
   #caption{position:fixed;z-index:5;left:50%;bottom:78px;transform:translateX(-50%) translateY(14px);
     width:min(760px,92vw);text-align:center;opacity:0;transition:opacity .7s,transform .7s;pointer-events:none}
@@ -230,18 +230,6 @@
   <!-- Music: Space Opera Prelude: The Void — committed to lib/ -->
   <audio id="bgm" loop muted preload="auto" src="lib/Space Opera Prelude_ The Void.mp3"></audio>
 
-  <!-- Timeline scrubber — 10 shots (max = 9) -->
-  <input id="timeline" type="range" min="0" max="9" step="1" value="0"
-    style="position:fixed;bottom:38px;left:50%;transform:translateX(-50%);
-           width:220px;opacity:0.55;z-index:999;accent-color:#ffd700;">
-  <script>
-    document.getElementById('timeline').addEventListener('input', e => {
-      if(window.Director) window.Director.goToShot(+e.target.value);
-    });
-    const _t = document.getElementById('timeline');
-    setInterval(() => { if(window.Director) _t.value = Math.max(0, window.Director.i); }, 500);
-  </script>
-
   <div id="boot">
     <div class="bt"></div>
     <div class="bs"></div>
@@ -255,5 +243,10 @@
   <script src="lib/CSS2DRenderer.js"></script>
   <script src="data.js"></script>
   <script type="module" src="app.js"></script>
+  <script type="module">
+    import { scene } from './core.js';
+    import { initSpaceBg } from './lib/space-bg.js';
+    initSpaceBg(scene);
+  </script>
 </body>
 </html>
