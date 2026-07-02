@@ -97,7 +97,7 @@
   <div id="act" class="overlay"></div>
 
   <div id="hint" class="overlay">
-    <b>SPACE</b> 暫停／播放 &nbsp;·&nbsp; <b>← →</b> 切幕 &nbsp;·&nbsp; <b>H</b> 隱藏介面
+    <b>拖曳</b> 旋轉 &nbsp;·&nbsp; <b>滾輪</b> 縮放 &nbsp;·&nbsp; <b>SPACE</b> 暫停 &nbsp;·&nbsp; <b>← →</b> 切幕 &nbsp;·&nbsp; <b>H</b> 隱藏
   </div>
 
   <div id="narr" class="overlay"><span id="cc"></span><span id="ntxt"></span></div>
@@ -142,14 +142,18 @@ const CFG = {
   starCount : 9000,
   starShell : [6200, 9600],
   sunDir    : [1.0, 0.34, 0.55],
+  // Solomon — the subject, at origin. Sized so the authored fleet tracks clear
+  // its hull (with the radial clamp below they never fly through it).
+  solomonSize : 30,
   // distant backdrop (dim, never steals the frame — the battle is the subject)
   earthPos  : [-1700, -260, -2500], earthSize: 120,
   // Luna ORBITS Earth (moonPivot at Earth's centre) — not a fixed corridor point
   moonOrbit : 340, moonSize : 26, moonTilt : 0.42,
-  // deep-corridor backdrops — Zeon side, the direction Zeon retreats toward in S10.
-  // A Baoa Qu = the gate beyond Solomon (violet, same shape); Side 3 = deepest.
-  abaoaquPos : [-560, 120, -640], abaoaquSize : 70,
-  side3Pos   : [-820, 150, -980],
+  // deep-corridor backdrops — Solomon → A Baoa Qu → Side 3 receding into the
+  // Zeon-deep distance (the way Zeon retreats in S10). A Baoa Qu is the far gate:
+  // moderate size + long distance so it reads as distant, not looming over Solomon.
+  abaoaquPos : [-780, 70, -900], abaoaquSize : 46,
+  side3Pos   : [-1080, 110, -1240],
 };
 
 /* ----------------------------------------- factions (colour + emblem) -----
@@ -547,11 +551,15 @@ function makePathSoFar(curve, color, samples){
 
 const TRAIL_KINDS = new Set(['fleet','command','hero-ms','ms']);
 const PATH_KINDS  = new Set(['fleet','command','hero-ms']);
+// units never penetrate Solomon — anything closer than CLEAR is pushed out to
+// the hull shell (assault units "land" on the surface instead of clipping in).
+const CLAMP_KINDS = new Set(['fleet','command','hero-ms','ms']);
+const CLEAR = CFG.solomonSize + 6;
 
 function buildUnit(u){
   const F = FACTION[u.faction];
   switch(u.kind){
-    case 'fortress':  return buildFortress({ size:40, place:'solomon' }); // Solomon place-colour (amber)
+    case 'fortress':  return buildFortress({ size:CFG.solomonSize, place:'solomon' }); // Solomon place-colour (amber)
     case 'fleet':     return buildFleet(u.faction, 6);
     case 'command':   { const c = buildShip(u.faction, 2.0); c.add(emblemSprite(F)); return c; }
     case 'ms':        return buildMobileSuit(u.faction);
@@ -735,6 +743,21 @@ function dur(S){ return 2.4 + S.hold; }
  * the frame glides instead of freezing dead after the 2.4s establishing tween. */
 const UP = new THREE.Vector3(0,1,0), _camOff = new THREE.Vector3();
 const ORBIT = 0.024;                                   // rad/s idle orbit during the hold
+// manual free-look: drag to orbit, wheel to zoom — applied on top of the scripted
+// camera each frame (works while playing OR paused). baseCamPos = scripted base.
+let userYaw = 0, userPitch = 0, userZoom = 1;
+const _uv = new THREE.Vector3(), _rv = new THREE.Vector3(), baseCamPos = new THREE.Vector3();
+function applyView(){                                   // scripted base → user offset → look
+  camera.position.copy(baseCamPos);
+  if(userYaw!==0 || userPitch!==0 || userZoom!==1){
+    const off = _uv.subVectors(camera.position, curLook).applyAxisAngle(UP, userYaw);
+    const right = _rv.crossVectors(UP, off);
+    if(right.lengthSq() > 1e-8){ right.normalize(); off.applyAxisAngle(right, userPitch); }
+    off.multiplyScalar(userZoom);
+    camera.position.copy(curLook).add(off);
+  }
+  camera.lookAt(curLook);
+}
 const DURS = SCENES.map(dur);
 const TOTAL = DURS.reduce((a,b)=>a+b, 0);
 const CUM = []; DURS.reduce((a,d,i)=>{ CUM[i]=a; return a+d; }, 0);   // scene start times
@@ -789,7 +812,7 @@ function enterScene(idx){
   si = idx; phase = 0;
   const S = SCENES[idx];
   clearStage();
-  camFrom.pos.copy(camera.position); camFrom.look.copy(curLook);
+  camFrom.pos.copy(baseCamPos); camFrom.look.copy(curLook);
   camTo.pos.set(...S.cam.pos); camTo.look.set(...S.cam.look);
   sceneArrayPos = null;
   const D = dur(S);
@@ -834,13 +857,18 @@ function playUpdate(dt){
     camera.position.copy(camTo.look).add(_camOff);
     camera.position.y += Math.sin(ot * 0.45) * 2.0;   // gentle vertical bob for life
   }
-  camera.lookAt(curLook);
+  baseCamPos.copy(camera.position);                   // scripted base; applyView() adds free-look + lookAt
   const p = easeIO(Math.min(1, phase/D));
   for(const lu of liveUnits){
     if(lu.curve){ lu.curve.getPoint(p, lu.obj.position);
       // face direction of travel
       const ahead = lu.curve.getPoint(Math.min(1, p+0.02));
       if(ahead.distanceToSquared(lu.obj.position)>1e-4) lu.obj.lookAt(ahead);
+    }
+    // keep units outside Solomon's hull — no fly-through (assault units hug the shell)
+    if(CLAMP_KINDS.has(lu.u.kind)){
+      const d2 = lu.obj.position.lengthSq();
+      if(d2 > 1e-6 && d2 < CLEAR*CLEAR) lu.obj.position.multiplyScalar(CLEAR/Math.sqrt(d2));
     }
     // solar array charge / fire
     if(lu.u.kind==='artillery'){
@@ -886,6 +914,24 @@ window.addEventListener('keydown', e=>{
   else if(e.key==='ArrowRight') enterScene((si+1)%SCENES.length);
   else if(e.key==='ArrowLeft') enterScene((si-1+SCENES.length)%SCENES.length);
 });
+/* ---- free-look: drag to orbit · wheel to zoom · double-click to reset ------ */
+const dom = renderer.domElement; dom.style.cursor = 'grab';
+let dragging=false, lastX=0, lastY=0;
+dom.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;
+  dom.style.cursor='grabbing'; dom.setPointerCapture(e.pointerId); });
+dom.addEventListener('pointermove', e=>{ if(!dragging) return;
+  userYaw   -= (e.clientX-lastX)*0.005;
+  userPitch += (e.clientY-lastY)*0.005;
+  userPitch  = Math.max(-1.2, Math.min(1.2, userPitch));
+  lastX=e.clientX; lastY=e.clientY; });
+function endDrag(){ dragging=false; dom.style.cursor='grab'; }
+dom.addEventListener('pointerup', endDrag);
+dom.addEventListener('pointercancel', endDrag);
+dom.addEventListener('wheel', e=>{ e.preventDefault();
+  userZoom *= (1 + Math.sign(e.deltaY)*0.08);
+  userZoom  = Math.max(0.45, Math.min(2.4, userZoom)); }, { passive:false });
+dom.addEventListener('dblclick', ()=>{ userYaw=0; userPitch=0; userZoom=1; });   // reset the view
+
 window.addEventListener('resize', ()=>{
   camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -897,11 +943,13 @@ window.addEventListener('resize', ()=>{
 const clock = new THREE.Clock();
 // opening: start pulled back so S1 tween eases in
 camera.position.set(210, 120, 240); curLook.set(0,0,0); camera.lookAt(curLook);
+baseCamPos.copy(camera.position);   // seed the scripted base before the first scene
 
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   if(!paused) playUpdate(dt);
+  applyView();                       // free-look offset + lookAt — runs even while paused
   updateFx(dt);
   // backdrop motion — Earth spins, Luna orbits it, the fortresses idle-rotate
   earth.rotation.y   += dt*0.01;
