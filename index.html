@@ -36,7 +36,7 @@
   #act .n{color:var(--ink-dim);font-weight:400;margin-right:8px}
 
   /* narration band — bottom-center */
-  #narr{position:fixed;left:50%;bottom:54px;z-index:3;transform:translateX(-50%);
+  #narr{position:fixed;left:50%;bottom:74px;z-index:3;transform:translateX(-50%);
     width:min(820px,90vw);text-align:center;pointer-events:none}
   #cc{display:block;margin-bottom:10px;line-height:1}
   .cc{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.72rem;
@@ -48,13 +48,28 @@
     background:var(--panel);padding:7px 16px;border-radius:4px;
     border:1px solid var(--edge);backdrop-filter:blur(3px)}
 
-  /* progress dots — bottom-center under narration */
-  #dots{position:fixed;left:50%;bottom:30px;z-index:3;transform:translateX(-50%);
-    display:flex;gap:7px;pointer-events:none}
-  #dots i{width:7px;height:7px;border-radius:50%;background:rgba(140,180,240,.25);
-    transition:background .4s,box-shadow .4s}
-  #dots i.on{background:var(--amber);box-shadow:0 0 8px var(--amber-glow)}
-  #dots i.done{background:var(--ink-dim)}
+  /* transport — play · time-scrubber · clock · music, bottom-center */
+  #controls{position:fixed;left:50%;bottom:24px;z-index:3;transform:translateX(-50%);
+    width:min(760px,88vw);display:flex;align-items:center;gap:12px;pointer-events:auto}
+  body.bare #controls{pointer-events:none}
+  #controls button{flex:0 0 auto;background:var(--panel);color:var(--ink);
+    border:1px solid var(--edge);border-radius:50%;width:34px;height:34px;cursor:pointer;
+    font-family:var(--mono);transition:color .2s,border-color .2s}
+  #controls button:hover{color:var(--amber);border-color:var(--amber)}
+  #play{font-size:13px}
+  #music-btn{font-size:14px}
+  #music-btn.off{opacity:.55}
+  #prog{flex:1;height:6px;border-radius:3px;background:rgba(140,180,240,.18);
+    position:relative;cursor:pointer;touch-action:none}
+  #prog > i{display:block;height:100%;width:0;border-radius:3px;
+    background:linear-gradient(90deg,var(--blue),var(--amber));box-shadow:0 0 8px var(--amber-glow)}
+  #prog .ticks{position:absolute;inset:0;pointer-events:none}
+  #prog .ticks b{position:absolute;top:-3px;width:2px;height:12px;border-radius:1px;
+    background:rgba(140,180,240,.42);transform:translateX(-50%)}
+  #prog .knob{position:absolute;top:50%;left:0;width:12px;height:12px;border-radius:50%;
+    background:var(--amber);box-shadow:0 0 8px var(--amber-glow);transform:translate(-50%,-50%);pointer-events:none}
+  #time{flex:0 0 auto;font:500 11px/1 var(--mono);color:var(--ink-dim);letter-spacing:.05em;
+    min-width:82px;text-align:right;font-variant-numeric:tabular-nums}
 
   /* control hint — top-right, hidden by `h` */
   #hint{position:fixed;right:18px;top:18px;z-index:3;font:400 11px/1.6 var(--mono);
@@ -86,9 +101,18 @@
   </div>
 
   <div id="narr" class="overlay"><span id="cc"></span><span id="ntxt"></span></div>
-  <div id="dots" class="overlay"></div>
+
+  <div id="controls" class="overlay">
+    <button id="play" title="播放／暫停 Play / pause" aria-label="Play / pause">⏸</button>
+    <div id="prog" role="slider" aria-label="時間軸 Timeline"><i></i><div class="ticks"></div><div class="knob"></div></div>
+    <span id="time">0:00 / 0:00</span>
+    <button id="music-btn" class="off" title="音樂 Music" aria-label="Background music">🔇</button>
+  </div>
 
   <div id="credit"><a href="https://www.linkedin.com/in/icomppower/" target="_blank" rel="noopener">Built by Johnny Lai · icomppower</a></div>
+
+  <!-- Music: Rise of the Iron Vanguard — committed to lib/. Muted autoplay (in sync); a deliberate click unmutes. -->
+  <audio id="bgm" loop muted preload="auto" src="lib/Rise of the Iron Vanguard.mp3"></audio>
 
   <div id="boot">Initialising void…</div>
 
@@ -694,10 +718,8 @@ function updateFx(dt){
 
 /* ================================================== 10 · SCENES PLAYER ===== */
 const overlay = { act:document.getElementById('act'), cc:document.getElementById('cc'),
-  ntxt:document.getElementById('ntxt'), dots:document.getElementById('dots') };
+  ntxt:document.getElementById('ntxt') };
 const CCMAP = { CANON:'canon', VARIANT:'variant', SUPP:'supp', STAGING:'staging' };
-// progress dots
-SCENES.forEach(()=>{ const i=document.createElement('i'); overlay.dots.appendChild(i); });
 
 let si = -1, phase = 0, paused = false;
 const camFrom = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
@@ -708,6 +730,52 @@ let liveUnits = [], sceneArrayPos = null;
 function easeIO(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
 function dur(S){ return 2.4 + S.hold; }
 
+/* ---- transport: play/pause · time-scrubber · clock · muted-autoplay music ----
+ * ORBIT keeps the camera slowly circling the look target through each hold, so
+ * the frame glides instead of freezing dead after the 2.4s establishing tween. */
+const UP = new THREE.Vector3(0,1,0), _camOff = new THREE.Vector3();
+const ORBIT = 0.024;                                   // rad/s idle orbit during the hold
+const DURS = SCENES.map(dur);
+const TOTAL = DURS.reduce((a,b)=>a+b, 0);
+const CUM = []; DURS.reduce((a,d,i)=>{ CUM[i]=a; return a+d; }, 0);   // scene start times
+function fmtT(s){ s=Math.max(0,Math.floor(s)); return ((s/60)|0)+':'+String(s%60).padStart(2,'0'); }
+function elapsedT(){ return si>=0 ? CUM[si] + Math.min(phase, DURS[si]) : 0; }
+
+const progEl   = document.getElementById('prog');
+const fillEl   = progEl.querySelector('i');
+const knobEl   = progEl.querySelector('.knob');
+const timeEl   = document.getElementById('time');
+const playBtn  = document.getElementById('play');
+const bgm      = document.getElementById('bgm'); bgm.volume = 0.55;
+const musicBtn = document.getElementById('music-btn');
+let soundOn = false, scrubbing = false;
+
+(function(){ const t=progEl.querySelector('.ticks');   // one tick per act boundary
+  CUM.forEach((c,i)=>{ if(i===0) return; const b=document.createElement('b'); b.style.left=(c/TOTAL*100)+'%'; t.appendChild(b); }); })();
+
+function paintTransport(fr, tsec){
+  fillEl.style.width = (fr*100)+'%'; knobEl.style.left = (fr*100)+'%';
+  timeEl.textContent = fmtT(tsec)+' / '+fmtT(TOTAL);
+}
+function updateTransport(){ if(scrubbing) return; const t=elapsedT(); paintTransport(TOTAL?t/TOTAL:0, t); }
+function updatePlayBtn(){ playBtn.textContent = paused ? '▶' : '⏸'; }
+function paintMusic(){ musicBtn.textContent = soundOn ? '🔊' : '🔇'; musicBtn.classList.toggle('off', !soundOn); }
+function syncMusic(){ if(soundOn && !paused) bgm.play().catch(()=>{}); else bgm.pause(); }
+
+playBtn.onclick  = ()=>{ paused=!paused; updatePlayBtn(); syncMusic(); };
+musicBtn.onclick = ()=>{ soundOn=!soundOn; bgm.muted=!soundOn; paintMusic(); syncMusic(); };
+
+// scrub to seek — preview live during the drag, commit (rebuild the act) on release
+function fracFromEvent(ev){ const r=progEl.getBoundingClientRect(); return Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)); }
+function seekTo(fr){ const t=fr*TOTAL; let idx=SCENES.length-1;
+  for(let i=0;i<SCENES.length;i++){ if(t < CUM[i]+DURS[i]){ idx=i; break; } }
+  enterScene(idx); phase = Math.min(Math.max(0, t-CUM[idx]), DURS[idx]-0.01); syncMusic(); }
+progEl.addEventListener('pointerdown', e=>{ scrubbing=true; progEl.setPointerCapture(e.pointerId);
+  const fr=fracFromEvent(e); paintTransport(fr, fr*TOTAL); });
+progEl.addEventListener('pointermove', e=>{ if(!scrubbing) return; const fr=fracFromEvent(e); paintTransport(fr, fr*TOTAL); });
+progEl.addEventListener('pointerup', e=>{ if(!scrubbing) return; scrubbing=false; seekTo(fracFromEvent(e)); });
+progEl.addEventListener('pointercancel', ()=>{ scrubbing=false; });
+
 function clearStage(){
   for(let i=stage.children.length-1;i>=0;i--){ const c=stage.children[i]; stage.remove(c); disposeObj(c); }
   liveUnits.length=0; fxList.length=0; beamList.length=0; trailList.length=0;
@@ -716,7 +784,6 @@ function setOverlay(S, idx){
   overlay.act.innerHTML = `<span class="n">${S.id} / ${SCENES.length}</span>${S.title}`;
   overlay.cc.innerHTML = S.cc.map(c=>`<span class="cc ${CCMAP[c]}">${c}</span>`).join('');
   overlay.ntxt.textContent = S.narr;
-  [...overlay.dots.children].forEach((d,i)=>{ d.className = i===idx ? 'on' : (i<idx?'done':''); });
 }
 function enterScene(idx){
   si = idx; phase = 0;
@@ -756,10 +823,17 @@ function playUpdate(dt){
   if(si<0) return;
   const S = SCENES[si], D = dur(S);
   phase += dt;
-  // camera tween over first 2.4s, then hold
+  // camera: 2.4s establishing tween, then a slow continuous orbit through the
+  // hold (alternating direction per act) so the shot glides instead of freezing.
   const e = easeIO(Math.min(1, phase/2.4));
   camera.position.lerpVectors(camFrom.pos, camTo.pos, e);
   curLook.lerpVectors(camFrom.look, camTo.look, e);
+  if(phase > 2.4){
+    const ot = phase - 2.4, dir = (si % 2) ? 1 : -1;
+    _camOff.subVectors(camTo.pos, camTo.look).applyAxisAngle(UP, ot * ORBIT * dir);
+    camera.position.copy(camTo.look).add(_camOff);
+    camera.position.y += Math.sin(ot * 0.45) * 2.0;   // gentle vertical bob for life
+  }
   camera.lookAt(curLook);
   const p = easeIO(Math.min(1, phase/D));
   for(const lu of liveUnits){
@@ -808,7 +882,7 @@ function playUpdate(dt){
 /* ===================================================== 11 · CONTROLS ======= */
 window.addEventListener('keydown', e=>{
   if(e.key==='h'||e.key==='H') document.body.classList.toggle('bare');
-  else if(e.code==='Space'){ e.preventDefault(); paused=!paused; }
+  else if(e.code==='Space'){ e.preventDefault(); paused=!paused; updatePlayBtn(); syncMusic(); }
   else if(e.key==='ArrowRight') enterScene((si+1)%SCENES.length);
   else if(e.key==='ArrowLeft') enterScene((si-1+SCENES.length)%SCENES.length);
 });
@@ -836,6 +910,7 @@ function animate(){
   abaoaqu.rotation.y += dt*0.03;
   side3.rotation.y   += dt*0.008;
   starMat.uniforms.uTime.value = t;
+  updateTransport();
   composer.render();                 // bloom pipeline replaces renderer.render()
 }
 
@@ -847,7 +922,13 @@ window.addEventListener('hashchange', ()=>{
 });
 
 const boot = document.getElementById('boot');
-requestAnimationFrame(()=>{ enterScene(startIdx); animate(); setTimeout(()=>boot.classList.add('gone'), 400); });
+requestAnimationFrame(()=>{
+  enterScene(startIdx);
+  updatePlayBtn(); paintMusic(); updateTransport();
+  bgm.play().catch(()=>{});      // muted autoplay — silent + in sync; the music button unmutes
+  animate();
+  setTimeout(()=>boot.classList.add('gone'), 400);
+});
 </script>
 </body>
 </html>
