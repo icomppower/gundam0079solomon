@@ -94,6 +94,13 @@
 
 <!-- Three.js r128, single script from cdnjs (no bundler, no build step) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- r128 postprocessing addons (bloom) — attach to the global THREE, no bundler needed -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 /* ============================================================================
  * 所羅門攻略戰 · BATTLE OF SOLOMON · U.C. 0079
@@ -111,18 +118,29 @@ const CFG = {
   starCount : 9000,
   starShell : [6200, 9600],
   sunDir    : [1.0, 0.34, 0.55],
-  // distant backdrop (dim, small, never steals the frame — battle is the subject)
-  earthPos  : [-1700, -260, -2500], earthSize: 80,
-  moonPos   : [-2050, -120, -2750], moonSize : 24,
+  // distant backdrop (dim, never steals the frame — the battle is the subject)
+  earthPos  : [-1700, -260, -2500], earthSize: 120,
+  // Luna ORBITS Earth (moonPivot at Earth's centre) — not a fixed corridor point
+  moonOrbit : 340, moonSize : 26, moonTilt : 0.42,
+  // deep-corridor backdrops — Zeon side, the direction Zeon retreats toward in S10.
+  // A Baoa Qu = the gate beyond Solomon (violet, same shape); Side 3 = deepest.
+  abaoaquPos : [-560, 120, -640], abaoaquSize : 70,
+  side3Pos   : [-820, 150, -980],
 };
 
-/* ----------------------------------------- factions (colour + emblem) ----- */
+/* ----------------------------------------- factions (colour + emblem) -----
+ * Locked 2026-07-01 visual language: SIDE colour (eff/zeon) marks the faction,
+ * PLACE colour (solomon/abaoaqu) marks the fortress. `glow` is the emissive/
+ * trail/engine tint that blooms; `hull` is the matte body.                    */
 const FACTION = {
-  eff:  { hull:0x8c98a8, light:0x9fd0ff, core:0x9fd0ff, emblem:'EFF'  }, // 聯邦 — 冷藍鋼
-  zeon: { hull:0x6b6258, light:0xffb63c, core:0xffc861, emblem:'ZEON' }, // 吉翁 — 暖綠／金
+  eff:  { hull:0x8c98a8, light:0x9fd0ff, core:0x9fd0ff, glow:0x9fd0ff, emblem:'EFF'  }, // 聯邦 — 冷藍鋼／藍光
+  zeon: { hull:0x6b6258, light:0xffb63c, core:0xffc861, glow:0x7dffa0, emblem:'ZEON' }, // 吉翁 — 綠光
+  solomon: { hull:0x9a7a4a, glow:0xffcf6a },   // place colour — 琥珀 amber
+  abaoaqu: { hull:0x6a5a9a, glow:0xb59aff },   // place colour — 紫 violet
 };
 function rgbStr(hex){ const c=new THREE.Color(hex); return `${(c.r*255)|0},${(c.g*255)|0},${(c.b*255)|0}`; }
-for(const k in FACTION){ FACTION[k].ls = rgbStr(FACTION[k].light); FACTION[k].hs = rgbStr(FACTION[k].hull); }
+for(const k in FACTION){ const F=FACTION[k]; F.gs = rgbStr(F.glow);
+  if(F.light!=null) F.ls = rgbStr(F.light); if(F.hull!=null) F.hs = rgbStr(F.hull); }
 
 /* --------------------------------------------------------- tiny utils ----- */
 function mulberry32(seed){
@@ -177,6 +195,14 @@ sceneEl.appendChild(renderer.domElement);
 
 const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 1, 40000);
 const sunDir = new THREE.Vector3(...CFG.sunDir).normalize();
+
+/* bloom pipeline — low threshold so only emissive/basic surfaces glow, matte
+ * standard-material hulls stay dark. Ported from the space-engine schematic. */
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloomPass = new THREE.UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.5, 0.45);
+composer.addPass(bloomPass);
 
 /* ========================================================= 2 · STAR FIELD = */
 function buildStars(){
@@ -233,7 +259,7 @@ const starMat = buildStars();
 /* =============================================================== 4 · SUN == */
 const sunLight = new THREE.DirectionalLight(0xfff2dd, 2.2);
 sunLight.position.copy(sunDir).multiplyScalar(4000); scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x223044, 0.6));
+scene.add(new THREE.AmbientLight(0x1a2634, 0.42));   // low fill so v2 hull terminator reads under bloom
 (function(){
   const g = new THREE.Group(); g.position.copy(sunDir.clone().multiplyScalar(7000));
   g.add(new THREE.Mesh(new THREE.SphereGeometry(120,24,24), new THREE.MeshBasicMaterial({color:0xfff6e6})));
@@ -241,87 +267,191 @@ scene.add(new THREE.AmbientLight(0x223044, 0.6));
   scene.add(g);
 })();
 
-/* ============================================ 5 · distant Earth / Luna ===== */
+/* ============================================ 5 · distant Earth / Luna =====
+ * buildEarth: matte (roughness 1.0) blue backdrop + a thin high-power Fresnel
+ * atmosphere. Matte on purpose — a shiny Earth blooms into a "flashlight"
+ * artifact under UnrealBloomPass. Ported from the space-engine schematic.     */
 function earthTexture(seed){
   const W=1024,H=512,c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d'), rnd=mulberry32(seed);
   const og=ctx.createLinearGradient(0,0,0,H);
-  og.addColorStop(0,'#0a2236'); og.addColorStop(0.5,'#0e3a5c'); og.addColorStop(1,'#0a2236');
+  og.addColorStop(0,'#0a2742'); og.addColorStop(0.5,'#0e3a63'); og.addColorStop(1,'#0a2540');
   ctx.fillStyle=og; ctx.fillRect(0,0,W,H);
-  const land=['#2f6b3a','#3c7a44','#6b7a3c','#8a7a4e','#4a6b3a'];
-  for(let k=0;k<10;k++){
-    const cx=rnd()*W, cy=H*0.18+rnd()*H*0.64, blobs=30+(rnd()*40|0);
+  const land=['#3c6b40','#4f7a45','#6e7a48','#8a7a52'];
+  const centers=[[170,210],[300,300],[510,180],[600,330],[760,250],[880,160],[120,360]];
+  ctx.save();
+  for(const [cx,cy] of centers){
+    const col=land[(rnd()*land.length)|0];
+    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=22;
+    const blobs=10+(rnd()*10|0);
     for(let b=0;b<blobs;b++){
-      const ang=rnd()*Math.PI*2, dist=Math.pow(rnd(),0.6)*(70+rnd()*120);
-      const x=cx+Math.cos(ang)*dist, y=cy+Math.sin(ang)*dist*0.6, r=14+rnd()*46;
-      const col=land[(rnd()*land.length)|0], g=ctx.createRadialGradient(x,y,0,x,y,r);
-      g.addColorStop(0,col); g.addColorStop(0.7,col); g.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=g; ctx.globalAlpha=0.85; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      const r=14+rnd()*38, x=cx+(rnd()-0.5)*140, y=cy+(rnd()-0.5)*90;
+      ctx.beginPath(); ctx.ellipse(x,y,r,r*(0.7+rnd()*0.5),rnd()*6.28,0,6.28); ctx.fill();
     }
   }
-  ctx.globalAlpha=1; return new THREE.CanvasTexture(c);
+  ctx.restore();
+  ctx.save(); ctx.fillStyle='#c8d8e8'; ctx.shadowColor='#c8d8e8'; ctx.shadowBlur=24;
+  for(let x=-40;x<W+40;x+=70){
+    ctx.beginPath(); ctx.ellipse(x,4,55,20,0,0,6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x,H-4,55,20,0,0,6.28); ctx.fill();
+  }
+  ctx.restore();
+  return new THREE.CanvasTexture(c);
 }
-const earth = new THREE.Group();
-earth.add(new THREE.Mesh(new THREE.SphereGeometry(CFG.earthSize,48,36),
-  new THREE.MeshPhongMaterial({ map:earthTexture(1337), shininess:6, specular:0x10283c })));
-earth.add(new THREE.Mesh(new THREE.SphereGeometry(CFG.earthSize*1.06,48,36),
-  new THREE.MeshBasicMaterial({ color:0x183a64, transparent:true, opacity:0.25,
-    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide })));
+function buildEarth(size){
+  const grp = new THREE.Group();
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size,64,48),
+    new THREE.MeshStandardMaterial({ map:earthTexture(1337), roughness:1.0, metalness:0.0 })));
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size*1.015,64,48), new THREE.ShaderMaterial({
+    side:THREE.BackSide, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false,
+    uniforms:{ uColor:{ value:new THREE.Color(0x6fb0ff) } },
+    vertexShader:`varying vec3 vN; varying vec3 vP;
+      void main(){ vN=normalize(normalMatrix*normal);
+        vP=normalize((modelViewMatrix*vec4(position,1.0)).xyz);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader:`varying vec3 vN; varying vec3 vP; uniform vec3 uColor;
+      void main(){ float f=pow(1.0-abs(dot(vN,vP)),28.0); gl_FragColor=vec4(uColor,f*0.35); }`,
+  })));
+  return grp;
+}
+const earth = buildEarth(CFG.earthSize);
 earth.position.set(...CFG.earthPos); scene.add(earth);
+
+// Luna — orbits Earth on a tilted pivot at Earth's centre (a moving body).
+function moonTexture(seed){
+  const W=512,H=256,c=document.createElement('canvas'); c.width=W;c.height=H;
+  const ctx=c.getContext('2d'), rnd=mulberry32(seed);
+  ctx.fillStyle='#9a9a93'; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<70;i++){
+    const x=rnd()*W, y=rnd()*H, r=4+rnd()*30, dark=rnd()<0.4, base=dark?110:150;
+    const g=ctx.createRadialGradient(x,y,0,x,y,r);
+    g.addColorStop(0,`rgb(${base-30},${base-30},${base-34})`);
+    g.addColorStop(0.8,`rgb(${base},${base},${base-6})`); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+const moonPivot = new THREE.Object3D();
+moonPivot.position.set(...CFG.earthPos); moonPivot.rotation.x = CFG.moonTilt; scene.add(moonPivot);
+const luna = new THREE.Mesh(new THREE.SphereGeometry(CFG.moonSize,48,36),
+  new THREE.MeshPhongMaterial({ map:moonTexture(424242), shininess:2 }));
+luna.position.set(CFG.moonOrbit, 0, 0); moonPivot.add(luna);
+
+// Side 3 — Zeon homeland, deepest along the corridor. A faint dot cluster.
+const side3 = new THREE.Group(); side3.position.set(...CFG.side3Pos);
 (function(){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(CFG.moonSize,32,24),
-    new THREE.MeshPhongMaterial({color:0x8f8f88, shininess:2}));
-  m.position.set(...CFG.moonPos); scene.add(m);
+  const rnd = mulberry32(311);
+  const colonyMat = new THREE.MeshStandardMaterial({ color:0xc8ccd6, roughness:0.35, metalness:0.7 });
+  for(let i=0;i<12;i++){
+    const len=10+rnd()*18, rad=1.6+rnd()*3;
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,12), colonyMat);
+    m.position.set((rnd()-0.5)*180,(rnd()-0.5)*110,(rnd()-0.5)*180);
+    m.rotation.set(rnd()*Math.PI,rnd()*Math.PI,rnd()*Math.PI); side3.add(m);
+  }
+  const np=70, sp=new Float32Array(np*3);
+  for(let i=0;i<np;i++){ sp[i*3]=(rnd()-0.5)*230; sp[i*3+1]=(rnd()-0.5)*140; sp[i*3+2]=(rnd()-0.5)*230; }
+  const sg=new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp,3));
+  side3.add(new THREE.Points(sg, new THREE.PointsMaterial({ color:0x9fc4ff, size:2.4,
+    transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false })));
 })();
+scene.add(side3);
 
 /* ============================================== 6 · buildFortress() factory ==
- * Solomon = displaced octahedron asteroid + gold trench lights + reactor core.
- * Core mesh is tagged 'reactorCore' so S10 can swap Zeon→EFF on capture.       */
-function buildFortress({ size, elongate=1, seed=7, color=0x8f8265, emissive=0x1c160c, coreColor=0xffc861 }){
-  const group = new THREE.Group(), rnd = mulberry32(seed);
-  const geo = new THREE.OctahedronGeometry(size,3), p = geo.attributes.position, v = new THREE.Vector3();
-  for(let i=0;i<p.count;i++){ v.fromBufferAttribute(p,i); v.multiplyScalar(0.72+rnd()*0.6); v.y*=elongate; p.setXYZ(i,v.x,v.y,v.z); }
-  geo.computeVertexNormals();
-  group.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color, emissive, emissiveIntensity:0.4, roughness:0.95, metalness:0.08, flatShading:true })));
-  const nL=90, lp=new Float32Array(nL*3);
-  for(let i=0;i<nL;i++){ const idx=(rnd()*p.count)|0; v.fromBufferAttribute(p,idx).multiplyScalar(1.02); lp[i*3]=v.x;lp[i*3+1]=v.y;lp[i*3+2]=v.z; }
-  const lgeo=new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lp,3));
-  group.add(new THREE.Points(lgeo, new THREE.PointsMaterial({ color:0xffd27a, size:Math.max(0.6,size*0.07),
-    transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false })));
-  const core = new THREE.Mesh(new THREE.SphereGeometry(size*0.16,16,16), new THREE.MeshBasicMaterial({color:coreColor}));
-  core.name='reactorCore'; group.add(core);
-  const glow = radialSprite([[0,`rgba(${rgbStr(coreColor)},1)`],[0.4,`rgba(${rgbStr(coreColor)},0.5)`],[1,`rgba(${rgbStr(coreColor)},0)`]], size*4.2, 0.85);
-  glow.name='coreGlow'; group.add(glow);
-  return group;
+ * v2 Death-Star-style: panel-textured sphere hull (matte MeshStandard, stays
+ * dark under bloom) + equatorial trench (dark torus + thin emissive strip) +
+ * offset superlaser-style dish. Solomon and A Baoa Qu share this shape and
+ * differ ONLY by place colour (amber vs violet). Lit elements are MeshBasic so
+ * UnrealBloomPass blooms the glow, never the hull.
+ * Tagged nodes 'trenchGlow' + 'reactorCore' let S10 swap Zeon→EFF on capture. */
+function panelTexture(hullHex){
+  const w=512,h=256,c=document.createElement('canvas'); c.width=w;c.height=h;
+  const ctx=c.getContext('2d'), hull=new THREE.Color(hullHex);
+  ctx.fillStyle=`rgb(${(hull.r*90)|0},${(hull.g*90)|0},${(hull.b*90)|0})`; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='rgba(0,0,0,0.4)';
+  for(let x=0;x<w;x+=20){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for(let y=0;y<h;y+=20){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+function buildFortress({ size=40, place='solomon' }){
+  const F = FACTION[place], glow = F.glow, grp = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({ map:panelTexture(F.hull), color:0xffffff, roughness:0.85, metalness:0.2 });
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size,72,54), hullMat));
+  const trench = new THREE.Mesh(new THREE.TorusGeometry(size*1.001, size*0.045, 8, 96),
+    new THREE.MeshStandardMaterial({ color:0x0c0c0c, roughness:1 }));
+  trench.rotation.x = Math.PI/2; grp.add(trench);
+  const trenchGlow = new THREE.Mesh(new THREE.TorusGeometry(size*1.001, size*0.013, 6, 96),
+    new THREE.MeshBasicMaterial({ color:glow }));
+  trenchGlow.rotation.x = Math.PI/2; trenchGlow.name='trenchGlow'; grp.add(trenchGlow);
+  const dishDir = new THREE.Vector3(0.35,0.82,0.45).normalize();
+  const dish = new THREE.Mesh(new THREE.CylinderGeometry(size*0.26,size*0.30,size*0.05,28),
+    new THREE.MeshStandardMaterial({ color:0x2b2b28, roughness:0.6, metalness:0.4 }));
+  dish.position.copy(dishDir).multiplyScalar(size*1.01);
+  dish.lookAt(dishDir.clone().multiplyScalar(size*2)); grp.add(dish);
+  const dishCore = new THREE.Mesh(new THREE.SphereGeometry(size*0.05,14,14), new THREE.MeshBasicMaterial({color:glow}));
+  dishCore.position.copy(dishDir).multiplyScalar(size*1.10); dishCore.name='reactorCore'; grp.add(dishCore);
+  return grp;
 }
 
-/* ====================================================== 7 · unit builders == */
-function shipMesh(F, scale){
-  const g = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.ConeGeometry(1.3*scale, 5*scale, 8),
-    new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.45, metalness:0.65,
-      emissive:F.hull, emissiveIntensity:0.06 }));
-  hull.rotation.x = Math.PI/2;          // point along +Z (travel direction)
-  g.add(hull);
-  const glow = makeSprite(glowTex('engine-'+F.emblem, [[0,`rgba(${F.ls},1)`],[1,`rgba(${F.ls},0)`]]), 5.5*scale, 0.85);
-  glow.position.set(0,0,-3*scale); g.add(glow);
-  return g;
+// A Baoa Qu — the gate beyond Solomon, same shape, violet. Distant backdrop on
+// the Zeon-deep side of the corridor (where Zeon retreats toward in S10).
+const abaoaqu = buildFortress({ size:CFG.abaoaquSize, place:'abaoaqu' });
+abaoaqu.position.set(...CFG.abaoaquPos); scene.add(abaoaqu);
+
+/* ====================================================== 7 · unit builders ==
+ * Ported from the space-engine schematic: primitive-hull fleet ships and small
+ * humanoid mobile suits, faction-coloured, oriented so their nose faces -Z (the
+ * travel direction the SCENES player aims each unit down via lookAt).          */
+function buildShip(factionKey, scale){
+  const F = FACTION[factionKey], grp = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.7, metalness:0.3, flatShading:true });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.8,9,8), mat);
+  body.rotation.x = Math.PI/2; grp.add(body);          // long axis along Z, wide end (-Z) = bow
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(1.3,2.6,8), mat);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -5.8; grp.add(nose);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,1.2), mat);
+  bridge.position.set(0,1.6,0.6); grp.add(bridge);
+  const eng = makeSprite(glowTex('eng-'+factionKey,
+    [[0,'rgba(255,255,255,1)'],[0.4,`rgba(${F.gs},1)`],[1,`rgba(${F.gs},0)`]]), 3.4, 0.9);
+  eng.position.z = 4.9; grp.add(eng);                  // engine glow at the stern (+Z)
+  if(scale) grp.scale.setScalar(scale);
+  return grp;
 }
-function buildFleet(F, count, scale){
-  const g = new THREE.Group(), rnd = mulberry32(count*131 + (F.hull&0xff));
+function buildFleet(factionKey, count){
+  const g = new THREE.Group(), rnd = mulberry32(count*131 + (FACTION[factionKey].hull&0xff));
   for(let i=0;i<count;i++){
-    const s = shipMesh(F, scale);
-    s.position.set((rnd()-0.5)*18*scale, (rnd()-0.5)*7*scale, (rnd()-0.5)*18*scale);
-    s.rotation.y = (rnd()-0.5)*0.5;
+    const s = buildShip(factionKey);
+    s.position.set((rnd()-0.5)*22, (rnd()-0.5)*9, (rnd()-0.5)*22);
+    s.rotation.y = (rnd()-0.5)*0.4;
     g.add(s);
   }
   return g;
 }
+function buildMobileSuit(factionKey, scale){
+  const F = FACTION[factionKey], grp = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.6, metalness:0.35, flatShading:true });
+  const accent = new THREE.MeshStandardMaterial({ color:F.glow, roughness:0.4, metalness:0.5,
+    emissive:F.glow, emissiveIntensity:0.35 });     // shoulders / eye / v-fin — pops under bloom
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.9,1.1,0.6), mat));       // torso
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28,10,8), mat); head.position.y=0.75; grp.add(head);
+  const vfin = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.4,4), accent);
+  vfin.position.set(0,0.98,-0.05); vfin.rotation.x=0.3; grp.add(vfin);    // faces -Z (travel dir)
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), accent);
+  eye.position.set(0,0.75,-0.26); grp.add(eye);
+  for(const s of [-1,1]){
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.9,6), mat);
+    arm.position.set(s*0.62,0.05,0); grp.add(arm);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.14,0.9,6), mat);
+    leg.position.set(s*0.24,-1.0,0); grp.add(leg);
+    const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.28,0.32), accent);
+    shoulder.position.set(s*0.62,0.5,0); grp.add(shoulder);
+  }
+  grp.scale.setScalar(2.2*(scale||1));
+  return grp;
+}
 function emblemSprite(F){
   const c=document.createElement('canvas'); c.width=c.height=128; const ctx=c.getContext('2d');
   ctx.clearRect(0,0,128,128);
-  const col = F.emblem==='EFF' ? '#9fd0ff' : '#ffb63c';
+  const col = F.emblem==='EFF' ? '#9fd0ff' : '#7dffa0';
   ctx.strokeStyle=col; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(64,64,40,0,Math.PI*2); ctx.stroke();
   ctx.fillStyle=col; ctx.font='bold 30px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(F.emblem, 64, 66);
@@ -329,33 +459,80 @@ function emblemSprite(F){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.95,depthWrite:false}));
   sp.scale.set(9,9,1); sp.name='emblem'; return sp;
 }
-function buildSolarArray(){
-  const g = new THREE.Group();
-  const panelMat = new THREE.MeshStandardMaterial({ color:0x6a7a8c, roughness:0.3, metalness:0.85,
-    side:THREE.DoubleSide, emissive:0x14304a, emissiveIntensity:0.3 });
-  for(let i=0;i<5;i++){
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(20,13), panelMat);
-    p.position.set((i-2)*15, (i%2)*5-2, 0); p.rotation.set(0,-0.4,0.06);
-    g.add(p);
+/* Solar System — canon-corrected reflector array (flat white panels, NO barrel/
+ * muzzle). The 'charge' sprite is what the S5/S6 player ramps and pulses.      */
+function buildSolarSystemFlat(size, hex){
+  const grp = new THREE.Group();
+  const panelMat = new THREE.MeshStandardMaterial({ color:0xf2f2f0, roughness:0.55, metalness:0.05, side:THREE.DoubleSide });
+  const gridMat = new THREE.LineBasicMaterial({ color:0xaab0bb, transparent:true, opacity:0.5 });
+  const nPanels = 5;
+  for(let i=0;i<nPanels;i++){
+    const a = (i-(nPanels-1)/2)*0.18;
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(size*0.34, size*1.5), panelMat);
+    panel.position.set(Math.sin(a)*size*0.55, 0, -Math.cos(a)*size*0.55*0.3); panel.rotation.y=a; grp.add(panel);
+    const wire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(size*0.34, size*1.5, 3, 8)), gridMat);
+    wire.position.copy(panel.position); wire.rotation.copy(panel.rotation); grp.add(wire);
   }
-  const core = makeSprite(glowTex('solar', [[0,'rgba(190,235,255,1)'],[0.4,'rgba(120,190,255,0.5)'],[1,'rgba(120,190,255,0)']]), 46, 0.0);
-  core.name='charge'; g.add(core);
-  g.userData.solar = true;
-  return g;
+  const focal = new THREE.Mesh(new THREE.SphereGeometry(size*0.05,10,10), new THREE.MeshBasicMaterial({ color:hex }));
+  focal.position.z = size*0.9; grp.add(focal);
+  const charge = makeSprite(glowTex('solar',
+    [[0,'rgba(190,235,255,1)'],[0.4,'rgba(120,190,255,0.5)'],[1,'rgba(120,190,255,0)']]), size*0.9, 0.0);
+  charge.name='charge'; grp.add(charge);
+  grp.userData.solar = true;
+  return grp;
 }
+
+/* motion trail — fading ring-buffer line behind a moving unit (additive, blooms) */
+function makeTrail(color, length){
+  const N = length, positions = new Float32Array(N*3), alphas = new Float32Array(N);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphas,1));
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{ uColor:{ value:new THREE.Color(color) } },
+    vertexShader:`attribute float aAlpha; varying float vA;
+      void main(){ vA=aAlpha; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`varying float vA; uniform vec3 uColor;
+      void main(){ gl_FragColor=vec4(uColor, vA); }`,
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
+  const line = new THREE.Line(geo, mat); line.frustumCulled = false;
+  const pts = [];
+  return { line, push(v){
+    pts.push(v.clone()); if(pts.length>N) pts.shift();
+    for(let i=0;i<N;i++){ const p = pts[i] || pts[0] || v;
+      positions[i*3]=p.x; positions[i*3+1]=p.y; positions[i*3+2]=p.z;
+      alphas[i] = pts[i] ? (i/(N-1))*0.85 : 0; }
+    geo.attributes.position.needsUpdate = true; geo.attributes.aAlpha.needsUpdate = true;
+  } };
+}
+/* permanent path-so-far — dashed "plotted course" of the WHOLE track, revealed
+ * progressively via setDrawRange, plus waypoint pins dropped along the way.    */
+function makePathSoFar(curve, color, samples){
+  samples = samples || 120;
+  const pos = new Float32Array(samples*3);
+  curve.getSpacedPoints(samples-1).forEach((p,i)=>{ pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z; });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setDrawRange(0,0);
+  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({
+    color, dashSize:6, gapSize:4, transparent:true, opacity:0.5 }));
+  line.computeLineDistances(); line.frustumCulled = false;
+  const markers = new THREE.Group();
+  return { line, markers, samples, color, lastMarkerP:-1 };
+}
+
+const TRAIL_KINDS = new Set(['fleet','command','hero-ms','ms']);
+const PATH_KINDS  = new Set(['fleet','command','hero-ms']);
+
 function buildUnit(u){
   const F = FACTION[u.faction];
   switch(u.kind){
-    case 'fortress': {
-      const f = buildFortress({ size:40, elongate:1.15, seed:7,
-        color:F.hull, coreColor:F.core });
-      return f;
-    }
-    case 'fleet':   return buildFleet(F, 6, 1);
-    case 'command': { const c = buildFleet(F, 1, 2.4); c.add(emblemSprite(F)); return c; }
-    case 'ms':      return shipMesh(F, 0.85);
-    case 'hero-ms': { const m = shipMesh(F, 1.15); m.userData.hero = true; return m; }
-    case 'artillery': return buildSolarArray();
+    case 'fortress':  return buildFortress({ size:40, place:'solomon' }); // Solomon place-colour (amber)
+    case 'fleet':     return buildFleet(u.faction, 6);
+    case 'command':   { const c = buildShip(u.faction, 2.0); c.add(emblemSprite(F)); return c; }
+    case 'ms':        return buildMobileSuit(u.faction);
+    case 'hero-ms':   { const m = buildMobileSuit(u.faction, 1.3); m.userData.hero = true; return m; }
+    case 'artillery': return buildSolarSystemFlat(60, 0xf2f2f0);
   }
   return new THREE.Group();
 }
@@ -558,10 +735,19 @@ function enterScene(idx){
       if(pts.length>=2){ curve = new THREE.CatmullRomCurve3(pts); curve.curveType='catmullrom'; curve.tension=0.4; }
     } else { start = new THREE.Vector3(...u.at); }
     obj.position.copy(start);
-    if(u.kind==='artillery') sceneArrayPos = start.clone();
+    if(u.kind==='artillery'){ sceneArrayPos = start.clone(); obj.lookAt(0,10,0); } // aim the reflector at the battle
     stage.add(obj);
-    liveUnits.push({ u, obj, curve, dead:!!u.dead,
-      deadAt:(u.deadDelay!=null?u.deadDelay:0.85)*D, exploded:false, captured:false });
+    const lu = { u, obj, curve, dead:!!u.dead,
+      deadAt:(u.deadDelay!=null?u.deadDelay:0.85)*D, exploded:false, captured:false };
+    // motion trail + permanent path-so-far for moving units (two-layer read:
+    // glowing trail = "where it is now", dashed path = "the whole route").
+    if(curve){
+      const gc = FACTION[u.faction].glow;
+      if(TRAIL_KINDS.has(u.kind)){ lu.trail = makeTrail(gc, 44); stage.add(lu.trail.line); }
+      if(PATH_KINDS.has(u.kind)){ lu.path = makePathSoFar(curve, gc);
+        stage.add(lu.path.line); stage.add(lu.path.markers); }
+    }
+    liveUnits.push(lu);
   }
   setOverlay(S, idx);
 }
@@ -587,11 +773,16 @@ function playUpdate(dt){
       const ch = lu.obj.getObjectByName('charge');
       if(ch) ch.material.opacity = lu.u.fire ? (0.3+0.7*Math.abs(Math.sin(phase*4))) : Math.min(0.6, phase/2.4*0.6);
     }
-    // hero-ms motion trail
-    if(lu.u.kind==='hero-ms' && lu.obj.visible && lu.curve){
-      const F = FACTION[lu.u.faction];
-      const tr = makeSprite(glowTex('trail-'+F.emblem, [[0,`rgba(${F.ls},0.9)`],[1,`rgba(${F.ls},0)`]]), 5, 0.5);
-      tr.position.copy(lu.obj.position); stage.add(tr); trailList.push({ sp:tr, t:0, life:0.6 });
+    // glowing motion trail + dashed path-so-far (revealed as the unit advances)
+    if(lu.trail && lu.obj.visible) lu.trail.push(lu.obj.position);
+    if(lu.path){
+      lu.path.line.geometry.setDrawRange(0, Math.max(2, Math.floor(p*lu.path.samples)));
+      if(p - lu.path.lastMarkerP > 0.12){
+        lu.path.lastMarkerP = p;
+        const pin = new THREE.Mesh(new THREE.SphereGeometry(1.6,8,8),
+          new THREE.MeshBasicMaterial({ color:lu.path.color, transparent:true, opacity:0.7 }));
+        pin.position.copy(lu.obj.position); lu.path.markers.add(pin);
+      }
     }
     // st:dead vaporise
     if(lu.dead && !lu.exploded && phase>=lu.deadAt){
@@ -600,13 +791,15 @@ function playUpdate(dt){
       spawnExplosion(lu.obj.position.clone(), lu.u.faction);
       lu.obj.visible = false;
     }
-    // S10 emblem swap (Zeon → EFF) at mid-hold
+    // S10 capture — Solomon changes hands: trench + dish glow turn EFF-blue,
+    // Federation emblem raised (renamed コンペイトウ in the narration).
     if(lu.u.capture && !lu.captured && phase > D*0.5){
       lu.captured = true;
-      const F = FACTION.eff;
-      const core = lu.obj.getObjectByName('reactorCore'); if(core) core.material.color.set(F.core);
-      const glow = lu.obj.getObjectByName('coreGlow'); if(glow) lu.obj.remove(glow);
-      lu.obj.add(emblemSprite(F));
+      const eff = FACTION.eff.glow;
+      const tg = lu.obj.getObjectByName('trenchGlow'); if(tg) tg.material.color.set(eff);
+      const rc = lu.obj.getObjectByName('reactorCore'); if(rc) rc.material.color.set(eff);
+      const em = emblemSprite(FACTION.eff);     // float above the solid hull so it reads
+      em.position.set(0, 56, 0); em.scale.set(20,20,1); lu.obj.add(em);
     }
   }
   if(phase >= D) enterScene((si+1) % SCENES.length);
@@ -622,6 +815,7 @@ window.addEventListener('keydown', e=>{
 window.addEventListener('resize', ()=>{
   camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
   starMat.uniforms.uPix.value = renderer.getPixelRatio();
 });
 
@@ -635,9 +829,14 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
   if(!paused) playUpdate(dt);
   updateFx(dt);
-  earth.rotation.y += dt*0.01;
+  // backdrop motion — Earth spins, Luna orbits it, the fortresses idle-rotate
+  earth.rotation.y   += dt*0.01;
+  moonPivot.rotation.y += dt*0.05;   // Luna's orbit around Earth
+  luna.rotation.y    += dt*0.02;
+  abaoaqu.rotation.y += dt*0.03;
+  side3.rotation.y   += dt*0.008;
   starMat.uniforms.uTime.value = t;
-  renderer.render(scene, camera);
+  composer.render();                 // bloom pipeline replaces renderer.render()
 }
 
 // deep-link to an act via hash (#6 → S6); defaults to opening act
