@@ -8,7 +8,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { ACTS, TRANSITION, SUN_DIR, MIRROR_CENTER, MIRROR_RADIUS, DUEL_CENTER, COMPANIONS, SHIP_NAME } from './acts.js';
+import { ACTS, TRANSITION, SUN_DIR, MIRROR_CENTER, MIRROR_RADIUS, DUEL_CENTER, COMPANIONS, SHIP_NAME, ESCORT_SLOTS, ESCORT_LOST, RAIDS } from './acts.js';
 
 /* ================================================================ utils == */
 const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -264,7 +264,7 @@ const C = {
 const SHIPS = { types: {}, used: {} };
 function shipPoolInit(gltf) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.6, metalness: 0.35 });
-  for (const name of ['eff_cruiser', 'zeon_cruiser', 'zeon_armor']) {
+  for (const name of ['eff_cruiser', 'eff_battleship', 'zeon_cruiser', 'zeon_armor', 'eff_ms', 'zeon_ms']) {
     const src = gltf.scene.getObjectByName(name);
     src.geometry.computeBoundingBox();
     SHIPS.types[name] = { geo: src.geometry, list: [], mat, len: src.geometry.boundingBox.max.z - src.geometry.boundingBox.min.z };
@@ -279,10 +279,16 @@ function ship(type, pos, target, opts = {}) {
   m.visible = true; m.position.copy(pos); m.lookAt(target);
   if (opts.roll) m.rotateZ(opts.roll);
   if (opts.scale) m.scale.setScalar(opts.scale); else m.scale.setScalar(1);
-  if (opts.engine !== false && type !== 'zeon_armor') {
+  const ms = type.endsWith('_ms');
+  if (ms && opts.engine !== false) {          // backpack thrusters
+    const k = opts.boost ?? 1;
+    const sc = opts.scale || 1;
+    for (const sx of [-0.9, 0.9]) { tmpV.set(sx * sc, 3.3 * sc, -3.6 * sc).applyQuaternion(m.quaternion).add(pos); FLASH.add(tmpV, (6 + 6 * k) * sc, type === "eff_ms" ? C.engine : C.zengine, 0.4 + 0.3 * k); }
+  } else if (opts.engine !== false && type !== 'zeon_armor') {
+    const eff = type.startsWith('eff'), big = type === 'eff_battleship';
     tmpV.set(0, 0, -T.len * 0.52).applyQuaternion(m.quaternion).add(pos);
-    FLASH.add(tmpV, type === 'eff_cruiser' ? 34 : 28, type === 'eff_cruiser' ? C.engine : C.zengine, 0.9);
-    if (type === 'eff_cruiser') for (const s of [-1, 1]) { tmpV2.set(24 * s, 0, -T.len * 0.5).applyQuaternion(m.quaternion).add(pos); FLASH.add(tmpV2, 22, C.engine, 0.7); }
+    FLASH.add(tmpV, eff ? (big ? 46 : 30) : 28, eff ? C.engine : C.zengine, 0.75);
+    if (eff) for (const s of [-1, 1]) { tmpV2.set((big ? 36 : 24) * s, 0, -T.len * 0.5).applyQuaternion(m.quaternion).add(pos); FLASH.add(tmpV2, big ? 30 : 20, C.engine, 0.6); }
   }
   return m;
 }
@@ -301,7 +307,7 @@ function placeHero(P) {
   if (heroMeta) { for (const g of heroMeta.gunTips) heroGuns.push(V(g).applyMatrix4(hero.matrixWorld)); for (const e of heroMeta.engines) heroEngines.push(V(e).applyMatrix4(hero.matrixWorld)); }
 }
 const ourGuns = (P) => (heroGuns.length ? heroGuns.map((g) => g.clone()) : [P.clone()]);
-const CHASE = { back: 400, up: 150, side: 185, ahead: 420 };
+const CHASE = { back: 440, up: 170, side: 205, ahead: 470 };
 
 function shipsFlush() { for (const k in SHIPS.types) { const T = SHIPS.types[k]; for (let i = SHIPS.used[k]; i < T.list.length; i++) T.list[i].visible = false; SHIPS.used[k] = 0; } }
 
@@ -490,17 +496,81 @@ const shipPosOf = (act, tau) => {
 function companions(P, alive, target = ORIGIN) {
   const out = [];
   COMPANIONS.forEach((o, i) => {
-    if (!alive.includes(i)) return;
-    const p = V(o).add(P); ship('eff_cruiser', p, target); out.push(p);
+    if (i < 5 && !alive.includes(i)) return;
+    const p = V(o).add(P);
+    if (p.length() < 2150) p.setLength(2150);          // never inside the fortress
+    ship(o[3] || 'eff_cruiser', p, target); out.push(p);
   });
   return out;
 }
-function fleetBlock(seed, base, n, target, type = 'eff_cruiser', spacing = 520) {
+/* ----------------------------------------------------- mobile suits ---- */
+const MS_SCALE = 1.8;   // anime scale: mobile suits drawn larger than true scale so they read beside a 265 m ship
+const H2W = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(hero.matrixWorld);
+const heroFwd = () => new THREE.Vector3(0, 0, 1).transformDirection(hero.matrixWorld);
+// Our squad: docked in S1–S2, launched from the catapults in S3, in formation after that.
+function escorts(actIdx, t) {
+  const out = []; if (!heroMeta) return out;
+  const fwd = heroFwd();
+  ESCORT_SLOTS.forEach((sl, i) => {
+    if (actIdx < 2) return;
+    const lost = ESCORT_LOST;
+    if (i === lost.index && (actIdx > lost.act || (actIdx === lost.act && t > lost.at + 1.5))) return;
+    const wob = new THREE.Vector3(Math.sin(t * 0.8 + i) * 7, Math.sin(t * 1.1 + i * 2) * 5, Math.sin(t * 0.6 + i * 3) * 9);
+    const slot = H2W(sl[0] + wob.x, sl[1] + wob.y, sl[2] + wob.z);
+    let pos = slot, boost = 0.35;
+    if (actIdx === 2) {
+      const Li = 1.2 + i * 0.85, cat = heroMeta.catapults[i % 2], ex = heroMeta.catapultExits[i % 2];
+      if (t < Li) return;
+      const a = H2W(...cat), b = H2W(ex[0], ex[1], ex[2] + 70);
+      if (t < Li + 0.7) {
+        const u = (t - Li) / 0.7; pos = a.lerp(b, u * u); boost = 1.4;
+        const exit = H2W(...ex); FLASH.add(exit, 40 * (1 - u), C.amber, 0.9);
+      } else {
+        const u = ease((t - Li - 0.7) / 3.0), c = H2W(ex[0], ex[1] + 25, ex[2] + 220);
+        pos = b.lerp(c, Math.min(1, u * 1.6)).lerp(slot, u); boost = 1.4 - u;
+      }
+    }
+    if (actIdx === lost.act && i === lost.index && t > lost.at) { boom(pos, lost.at, 60, t, C.fire, hero.position); if (t > lost.at + 0.2) return; }
+    ship('eff_ms', pos, pos.clone().add(fwd), { boost, scale: MS_SCALE }); out.push(pos);
+  });
+  return out;
+}
+// Zeon strafing runs past our hull; escorts shoot some down.
+function raid(actIdx, t, esc) {
+  const R = RAIDS[actIdx]; if (!R || !heroMeta) return [];
+  const out = [], hullPts = [];
+  for (let i = 0; i < R.n; i++) {
+    const h = (k) => hash(R.seed * 13.1 + i * 7.3 + k);
+    const dur = 4.2 + h(1) * 1.6, ti = R.t0 + (R.t1 - R.t0 - dur) * (i / Math.max(1, R.n - 1));
+    const u = (t - ti) / dur; if (u < 0 || u > 1.15) continue;
+    const side = h(2) < 0.5 ? -1 : 1;
+    const A = [side * (500 + h(3) * 400), 120 + h(4) * 220, 1100 + h(5) * 500], B = [side * (90 + h(6) * 90), 30 + h(7) * 90, 20 + h(8) * 120], Cc = [-side * (450 + h(9) * 300), -80 + h(10) * 160, -800 - h(11) * 300];
+    const at = (uu) => { const q = clamp(uu), a = 1 - q; return H2W(a * a * A[0] + 2 * a * q * B[0] + q * q * Cc[0], a * a * A[1] + 2 * a * q * B[1] + q * q * Cc[1], a * a * A[2] + 2 * a * q * B[2] + q * q * Cc[2]); };
+    const killed = R.kills.includes(i), killU = 0.52 + h(12) * 0.2;
+    if (killed && u > killU) { boom(at(killU), ti + killU * dur, 55, t, C.fire, hero.position); continue; }
+    if (u > 1) continue;
+    const p = at(u), dir = at(u + 0.02).sub(p);
+    ship('zeon_ms', p, p.clone().add(dir), { boost: 1, scale: MS_SCALE }); out.push(p);
+    // fires at our hull while closing
+    if (u > 0.18 && u < 0.62) {
+      const slot = Math.floor(t * 4 + i), age = t * 4 + i - slot;
+      if (hash(slot * 3.7 + i) < 0.7 && age < 0.5) {
+        const hp = H2W((hash(slot + 1) - 0.5) * 60, (hash(slot + 2) - 0.2) * 30, (hash(slot + 3) - 0.5) * 200);
+        LINES.add(p, p.clone().lerp(hp, clamp(age / 0.18)), C.zeonBeam, 1 - age * 2, 0.4);
+        if (age > 0.18 && hash(slot + 9) < 0.35) { FLASH.add(hp, 40, C.fire, (0.5 - age) * 2); FX.flash = Math.max(FX.flash, (0.5 - age) * 0.6); FX.shake = Math.max(FX.shake, (0.5 - age) * 0.4); }
+      }
+    }
+  }
+  if (esc.length && out.length) exchange(R.seed + 5, esc, out, 3, C.effBeam, C.zeonBeam, t, 0.3);
+  return out;
+}
+function fleetBlock(seed, base, n, target, type = 'eff_cruiser', spacing = 560) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const h = (k) => hash(seed * 11 + i * 5.1 + k);
     const p = base.clone().add(new THREE.Vector3((i % 3 - 1) * spacing + (h(1) - 0.5) * 200, (Math.floor(i / 3) % 2 - 0.5) * spacing * 0.6 + (h(2) - 0.5) * 160, Math.floor(i / 3) * spacing * 0.9 + (h(3) - 0.5) * 200));
-    ship(type, p, target); out.push(p);
+    if (p.length() < 2150) p.setLength(2150);
+    ship(type === 'eff_cruiser' && n >= 6 && i === 1 ? 'eff_battleship' : type, p, target); out.push(p);
   }
   return out;
 }
@@ -543,7 +613,7 @@ const DIRECTORS = {
     const F = swarm(14, 30, new THREE.Vector3(3400 - t * 70, 300, 6200 - t * 140), 1300, C.eff, t, { speed: 0.22 });
     exchange(15, Z, F, 4, C.zeonBeam, C.effBeam, t);
     for (let i = 0; i < 14; i++) boom(new THREE.Vector3(2600 + (hash(i) - 0.5) * 2600, 300 + (hash(i + 1) - 0.5) * 1400, 3600 + (hash(i + 2) - 0.5) * 2600), 3.5 + i * 0.95, 50 + hash(i + 3) * 90, t, C.fire, P);
-    if (t > 13.5) fleetFire(16, [...ourGuns(P), ...comp, ...f1], ORIGIN, t, 3, C.effBeam, 900);
+    if (t > 13.5) fleetFire(16, [...ourGuns(P), ...FX.esc, ...comp, ...f1], ORIGIN, t, 3, C.effBeam, 900);
   },
   S4(t, P) {
     const alive = t < ACTS[3].hitAt ? [0, 1, 2, 3, 4] : [1, 2, 3, 4];
@@ -556,7 +626,7 @@ const DIRECTORS = {
     const F = swarm(45, 36, new THREE.Vector3(1200, 100, 4200), 1700, C.eff, t, { speed: 0.24 });
     exchange(46, Z, F, 6, C.zeonBeam, C.effBeam, t);
     fortressGuns(47, t, 5, P.clone().add(new THREE.Vector3(0, 0, -800)), 2600);
-    fleetFire(48, [...ourGuns(P), ...comp, ...f1, ...f2], ORIGIN, t, 4, C.effBeam, 1000);
+    fleetFire(48, [...ourGuns(P), ...FX.esc, ...comp, ...f1, ...f2], ORIGIN, t, 4, C.effBeam, 1000);
     for (let i = 0; i < 16; i++) boom(new THREE.Vector3((hash(i + 40) - 0.3) * 3600, (hash(i + 41) - 0.5) * 2600, 2400 + hash(i + 42) * 3000), 1 + i * 1.05, 50 + hash(i + 43) * 110, t, C.fire, P);
     // the hit on our wingman
     const hitAt = ACTS[3].hitAt, w = V(COMPANIONS[0]).add(P);
@@ -637,7 +707,7 @@ const DIRECTORS = {
       const shot = (at, tgt) => { if (t > at && t < at + 0.8) { const a = 1 - (t - at) / 0.8; for (const o of [-14, 0, 14]) LINES.add(Apos.clone().add(new THREE.Vector3(o, 10, 0)), tgt, C.zeonBeam, a, 0.6); } };
       shot(6.2, victim3); shot(9.0, f1[1] || ORIGIN); shot(10.8, f1[4] || ORIGIN); shot(14.2, f1[2] || ORIGIN);
       if (t > 12.5) {
-        fleetFire(92, [...ourGuns(P), ...comp, ...f1], Apos, t, 5, C.effBeam, 60);
+        fleetFire(92, [...ourGuns(P), ...FX.esc, ...comp, ...f1], Apos, t, 5, C.effBeam, 60);
         const h = Math.floor(t * 9); FLASH.add(Apos.clone().add(new THREE.Vector3(hash(h) - 0.5, hash(h + 1) - 0.5, hash(h + 2) - 0.5).multiplyScalar(80)), 60, C.amber, 0.7);
       }
     }
@@ -744,7 +814,9 @@ function frame() {
   heatU.uHeat.value = 0;
   if (i >= 6 && mirrors) setMirrors(1, 1);
   placeHero(P);
+  const ESC = escorts(i, tau); FX.esc = ESC;
   DIRECTORS[act.id](tau, P);
+  raid(i, tau, ESC);
   debris.visible = i >= 6; if (debris.visible) setDebris(act, tau);
 
   const target = FX.lookBias ? ORIGIN.clone().lerp(FX.lookBias.target, FX.lookBias.w) : ORIGIN;

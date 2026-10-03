@@ -9,11 +9,12 @@ Outputs (assets/):
   fortress.glb          Solomon asteroid fortress (rock + structures), AO baked into vertex colour
   fortress_lights.json  surface beacon positions/normals (rendered as glow points at runtime)
   bridge.glb            bridge interior of our fictional cruiser, AO baked
-  ships.glb             original hulls: eff_cruiser, zeon_cruiser, zeon_armor
-  hero.glb / hero.json  蒼鷺號 Grey Heron, our own cruiser, detailed for the chase view (+ gun tips, engines, lights)
+  ships.glb             original hulls: eff_cruiser (destroyer), eff_battleship, zeon_cruiser, zeon_armor,
+                        and original mobile suits eff_ms, zeon_ms
+  hero.glb / hero.json  蒼鷺號 Grey Heron, our MS carrier-destroyer, detailed for the chase view (+ gun tips, engines, catapults)
 
 Everything is generated from a fixed seed, so the build is deterministic.
-Every hull here is an original design; no canon mecha or ship is modelled.
+Every hull and mobile suit here is an original design; no canon mecha or ship is modelled.
 """
 import bpy, bmesh, json, math, os, random, sys
 from mathutils import Vector, Matrix, noise
@@ -410,128 +411,249 @@ def build_bridge():
 
 
 # =================================================================== SHIPS ==
-# Blender: length along -Y (forward) -> glTF forward -Z.
+# All hulls are original designs. Blender: forward = -Y, up = +Z, metres.
+# glTF export maps (x, y, z) -> (x, z, -y), so noses end up at glTF +Z (three.js lookAt convention).
+ROT_FWD = (math.pi / 2, 0, 0)   # box helper: pre-rotation +z (taper end) -> -Y (nose)
+
+
+def _hash3(c):
+    v = math.sin(c[0] * 12.9898 + c[1] * 78.233 + c[2] * 37.719) * 43758.5453
+    return v - math.floor(v)
+
+
+def panel_fn(top, belly, accent=None, accent_band=None, cell=(7.0, 9.0, 5.0), belly_z=0.0):
+    """Albedo: panel variation, darker belly, optional accent band (y0, y1) on the upper hull."""
+    def fn(co, n):
+        k = 0.86 + 0.2 * (_hash3((math.floor(co.x / cell[0]), math.floor(co.y / cell[1]), math.floor(co.z / cell[2]))) - 0.5)
+        if accent and accent_band and accent_band[0] < co.y < accent_band[1] and co.z > belly_z:
+            c = accent
+        else:
+            c = top if co.z > belly_z else belly
+        return (c[0] * k, c[1] * k, c[2] * k)
+    return fn
+
+
+def join_objs(objs, name):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs: o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    objs[0].name = name; objs[0].data.name = name
+    return objs[0]
+
+
+def hull_top(h, L, y, k_end, p, cy=0.0):
+    """Height of the top of a tapered hull box at world y (for seating turrets)."""
+    z = -(y - cy) / L
+    k = 1 + (k_end - 1) * max(0.0, z + 0.5) ** p
+    return h / 2 * k
+
+
+def turret_parts(c, up, s, barrel_len, n_barrels=2):
+    """Returns (cyl_parts, box_parts, tips) for a twin turret seated at c, facing forward (-Y)."""
+    x, y, z = c
+    cyl = [((x, y, z + up * 0.5 * s), 4.2 * s, 1.6 * s, "z", 3.8 * s)]
+    box = [((x, y + 0.6 * s, z + up * 2.6 * s), (6.6 * s, 7.6 * s, 2.8 * s), None, None),
+           ((x, y - 3.2 * s, z + up * 2.4 * s), (5.2 * s, 1.4 * s, 2.2 * s), None, None)]
+    tips = []
+    offs = [-1.4 * s, 1.4 * s] if n_barrels == 2 else [-2.2 * s, 0, 2.2 * s]
+    for bx in offs:
+        box.append(((x + bx, y - 3.6 * s - barrel_len / 2, z + up * 2.6 * s), (0.9 * s, barrel_len, 0.9 * s), None, None))
+        tips.append((x + bx, y - 3.6 * s - barrel_len, z + up * 2.6 * s))
+    return cyl, box, tips
+
+
+def eff_warship(name, L, n_turrets, beam=1.0):
+    """Federation warship (original): angular wedge hull, keel, tower, side engine pods, dorsal turrets."""
+    s = L / 200.0
+    w, h = 28 * s * beam, 20 * s
+    TOP = (0.64, 0.65, 0.66); BEL = (0.34, 0.35, 0.37); RED = (0.58, 0.14, 0.12); BLUE = (0.16, 0.25, 0.48)
+    KE, PE = 0.32, 1.7
+    parts = [((0, 0, 0), (w, h, L), ROT_FWD, (KE, PE)),
+             ((0, 0.12 * L, -h * 0.55), (w * 0.62, h * 0.55, L * 0.72), ROT_FWD, (0.28, 1.4)),
+             ((0, 0.43 * L, h * 0.08), (w * 1.55, 0.2 * L, h * 1.35), None, None),
+             ((0, 0.14 * L, h * 0.5 + 7 * s), (w * 0.46, 0.15 * L, 14 * s), None, (0.75, 1.0)),
+             ((0, 0.10 * L, h * 0.5 + 15.5 * s), (w * 0.85, 0.065 * L, 5 * s), None, None),
+             ((0, 0.13 * L, h * 0.5 + 23 * s), (1.2 * s, 1.2 * s, 12 * s), None, None),
+             ((0, 0.44 * L, h * 0.9 + 9 * s), (2.4 * s, 0.14 * L, 16 * s), (0.3, 0, 0), None),
+             ((0, 0.0, -h * 0.95), (2.2 * s, 0.42 * L, 9 * s), None, None)]
+    for sx in (-1, 1):
+        parts.append(((sx * w * 0.78, 0.30 * L, 0), (w * 0.62, 0.20 * L, 2.2 * s), (0, sx * 0.22, 0), None))  # stabilisers
+        parts.append(((sx * w * 0.52, -0.02 * L, h * 0.05), (4.5 * s, 0.16 * L, 6 * s), None, None))          # sponsons
+    hullo = box_object(name + "_h", parts, TOP, cuts=3)
+    set_albedo(hullo, panel_fn(TOP, BEL, RED, (-0.36 * L, -0.30 * L), cell=(6 * s, 8 * s, 4 * s)))
+    pods = cyl_object(name + "_p", [((sx * w * 0.86, 0.36 * L, -h * 0.05), 7.5 * s, 0.34 * L, "y", 7.5 * s) for sx in (-1, 1)], (0.52, 0.53, 0.55), segs=12)
+    stripe = box_object(name + "_s", [((0, -0.12 * L, hull_top(h, L, -0.12 * L, KE, PE) + 0.15 * s), (w * 0.35, 0.2 * L, 0.4 * s), None, None)], BLUE, cuts=1)
+    tc, tb = [], []
+    for i in range(n_turrets):
+        y = [-0.27, -0.12, 0.27][i] * L if n_turrets <= 3 else (-0.3 + i * 0.16) * L
+        z = hull_top(h, L, y, KE, PE) + (8 * s if y > 0.2 * L else 0)
+        c, b, _ = turret_parts((0, y, z), 1, s * 1.15, 12 * s)
+        tc += c; tb += b
+    t1 = cyl_object(name + "_tc", tc, (0.30, 0.31, 0.33), segs=12)
+    t2 = box_object(name + "_tb", tb, (0.48, 0.49, 0.50), cuts=1)
+    return [hullo, pods, stripe, t1, t2]
+
+
+def zeon_warship(name, L):
+    """Zeon cruiser (original): rounded green hull, swept wing pods with hangar mouths, dorsal command fin."""
+    s = L / 220.0
+    G = (0.29, 0.39, 0.27); DG = (0.20, 0.26, 0.19); Y = (0.60, 0.50, 0.20)
+    body = cyl_object(name + "_b", [((0, 0, 0), 15 * s, 0.86 * L, "y", 6 * s), ((0, 0.4 * L, 0), 21 * s, 0.22 * L, "y", 17 * s)], G, segs=14)
+    set_albedo(body, panel_fn(G, DG, Y, (-0.33 * L, -0.30 * L), cell=(6 * s, 9 * s, 5 * s)))
+    wings = box_object(name + "_w", [
+        ((0, 0.05 * L, 20 * s), (3 * s, 0.32 * L, 22 * s), (0.2, 0, 0), None),
+        ((0, -0.05 * L, -19 * s), (3 * s, 0.4 * L, 15 * s), None, None),
+        ((-30 * s, 0.08 * L, -3 * s), (13 * s, 12 * s, 0.34 * L), ROT_FWD, (0.6, 1.2)),
+        ((30 * s, 0.08 * L, -3 * s), (13 * s, 12 * s, 0.34 * L), ROT_FWD, (0.6, 1.2)),
+        ((-19 * s, 0.12 * L, -3 * s), (12 * s, 0.12 * L, 3 * s), None, None),
+        ((19 * s, 0.12 * L, -3 * s), (12 * s, 0.12 * L, 3 * s), None, None),
+        ((0, 0.47 * L, 0), (70 * s, 0.07 * L, 4 * s), None, None)], DG, cuts=2)
+    mouths = box_object(name + "_m", [((sx * 30 * s, 0.08 * L - 0.17 * L - 0.3 * s, -3 * s), (10 * s, 0.6 * s, 9 * s), None, None) for sx in (-1, 1)], (0.04, 0.04, 0.05), cuts=0)
+    return [body, wings, mouths]
+
+
+def mobile_suit(name, faction):
+    """Original mass-production mobile suit, ~17 m, in a flying pose (forward -Y)."""
+    if faction == "eff":
+        MAIN = (0.78, 0.78, 0.76); SUB = (0.20, 0.30, 0.55); ACC = (0.65, 0.16, 0.13); DARK = (0.22, 0.23, 0.25); EYE = (0.55, 1.0, 0.75)
+    else:
+        MAIN = (0.30, 0.42, 0.28); SUB = (0.20, 0.27, 0.19); ACC = (0.42, 0.22, 0.18); DARK = (0.16, 0.17, 0.17); EYE = (1.0, 0.25, 0.55)
+    main = [((0, 0, 3.6), (5.0, 3.3, 4.0), None, (0.92, 1.0)),               # torso
+            ((0, 0, 0.9), (2.8, 2.3, 1.6), None, None),                       # waist
+            ((-3.5, 0, 5.1), (2.4, 2.7, 2.3), None, None), ((3.5, 0, 5.1), (2.4, 2.7, 2.3), None, None),   # shoulders
+            ((-1.25, 0.6, -2.0), (1.7, 1.9, 3.3), (0.32, 0, 0), None), ((1.25, 0.6, -2.0), (1.7, 1.9, 3.3), (0.32, 0, 0), None),  # thighs
+            ((-1.35, 1.6, -5.3), (2.0, 2.3, 4.2), (0.42, 0, 0), (0.85, 1.0)), ((1.35, 1.6, -5.3), (2.0, 2.3, 4.2), (0.42, 0, 0), (0.85, 1.0)),  # shins
+            ((-3.9, -0.9, 1.0), (1.6, 1.7, 2.8), (0.75, 0, 0), None), ((3.9, -0.9, 1.0), (1.6, 1.7, 2.8), (0.75, 0, 0), None)]  # forearms
+    sub = [((-3.7, 0, 3.4), (1.2, 1.2, 2.4), None, None), ((3.7, 0, 3.4), (1.2, 1.2, 2.4), None, None),   # upper arms
+           ((0, 1.9, 4.1), (3.3, 1.5, 3.3), None, None),                                                   # backpack
+           ((-1.35, 2.5, -7.6), (1.9, 3.0, 0.9), (0.45, 0, 0), None), ((1.35, 2.5, -7.6), (1.9, 3.0, 0.9), (0.45, 0, 0), None),  # feet
+           ((0, -1.25, -0.4), (2.6, 0.5, 1.9), (-0.15, 0, 0), None)]                                       # front skirt
+    acc = [((0, -1.75, 4.2), (2.2, 0.4, 1.4), None, None)]                                                 # chest plate
+    if faction == "eff":
+        head = [((0, -0.1, 6.55), (1.6, 1.8, 1.5), None, None), ((0, 0.25, 7.45), (0.25, 1.2, 0.6), None, None)]
+        acc.append(((-4.75, -1.2, 1.6), (0.4, 3.0, 4.6), (0.2, 0, 0), None))                               # shield
+        dark = [((4.3, -2.9, 0.4), (0.6, 5.8, 0.9), (0.08, 0, 0), None)]                                   # rifle
+        eye = [((0, -1.02, 6.7), (1.25, 0.12, 0.35), None, None)]                                          # visor
+    else:
+        head = [((0, -0.1, 6.5), (1.9, 2.0, 1.7), None, (0.7, 1.0)), ((0, 0.1, 7.5), (0.3, 1.6, 0.5), None, None)]
+        acc.append(((-4.2, 0, 5.6), (1.8, 3.4, 2.6), None, (0.6, 1.0)))                                     # shoulder armour
+        dark = [((4.35, -2.6, 0.3), (0.9, 4.6, 1.3), (0.08, 0, 0), None), ((4.35, -1.6, -0.6), (0.7, 1.4, 1.4), None, None)]  # gun + drum
+        eye = [((-0.35, -1.1, 6.6), (0.45, 0.12, 0.3), None, None), ((0.35, -1.1, 6.6), (0.45, 0.12, 0.3), None, None)]
+    objs = [box_object(name + "_a", main, MAIN, cuts=1), box_object(name + "_b", sub, SUB, cuts=1), box_object(name + "_c", acc, ACC, cuts=1),
+            box_object(name + "_d", head, MAIN, cuts=1), box_object(name + "_e", dark, DARK, cuts=1)]
+    objs.append(cyl_object(name + "_t", [((-0.9, 2.75, 3.3), 0.55, 1.2, "y", 0.7), ((0.9, 2.75, 3.3), 0.55, 1.2, "y", 0.7)], DARK, segs=8))
+    return objs, box_object(name + "_eye", eye, EYE, cuts=0)
+
+
 def build_ships():
     print("ships", flush=True)
     reset()
-    objs = []
-    # --- Federation cruiser (original): angular hull, twin side engine pods, dorsal tower
-    G = (0.62, 0.62, 0.60); R_ = (0.55, 0.20, 0.18)
-    hull = box_object("eff_cruiser", [
-        ((0, 0, 0), (26, 20, 200), (math.pi / 2, 0, 0), (0.35, 2.0)),       # main hull, tapered nose (-Y after rot)
-        ((0, 70, 2), (34, 60, 26), None, None),                              # engine block
-        ((0, 10, 16), (12, 40, 14), None, None),                             # dorsal tower
-        ((0, 4, 25), (18, 10, 4), None, None),                               # bridge cap
-        ((0, -40, -12), (4, 60, 10), None, None),                            # keel fin
-    ], G, cuts=2)
-    pods = cyl_object("eff_cruiser_pods", [((-24, 62, 0), 8, 70, "y", 7), ((24, 62, 0), 8, 70, "y", 7)], (0.50, 0.50, 0.50), segs=12)
-    stripe = box_object("eff_cruiser_stripe", [((0, -30, 10.5), (16, 40, 1.0), None, None)], R_, cuts=2)
-    # --- Zeon cruiser (original): rounded green hull with a ventral keel and dorsal fin
-    zg = (0.30, 0.40, 0.28)
-    zhull = cyl_object("zeon_cruiser", [((0, 0, 0), 16, 190, "y", 6), ((0, 70, 0), 22, 50, "y", 18)], zg, segs=14)
-    zfin = box_object("zeon_cruiser_fins", [((0, 20, 22), (3, 70, 26), None, None), ((0, -10, -20), (3, 90, 18), None, None),
-                                            ((0, 80, 0), (60, 18, 4), None, None)], (0.25, 0.33, 0.24), cuts=2)
-    # --- large Zeon mobile armour silhouette (original): squat dome with skirt and front ports
+    groups = {
+        "eff_cruiser": eff_warship("eff_cruiser", 200, 2),
+        "eff_battleship": eff_warship("eff_battleship", 380, 3, beam=1.15),
+        "zeon_cruiser": zeon_warship("zeon_cruiser", 230),
+    }
     dome_bm = bmesh.new()
     bmesh.ops.create_uvsphere(dome_bm, u_segments=24, v_segments=12, radius=45)
     for v in dome_bm.verts:
         if v.co.z < 0: v.co.z *= 0.35
         v.co.z *= 0.8
-    dome = obj_from_bm(dome_bm, "zeon_armor"); set_albedo(dome, lambda co, n: (0.30, 0.38, 0.30))
-    skirt = cyl_object("zeon_armor_skirt", [((0, 0, -6), 52, 10, "z", 58)], (0.24, 0.30, 0.24), segs=24)
-    objs = [hull, pods, stripe, zhull, zfin, dome, skirt]
-    bake_ao_into_col(objs, distance=30.0)
-    # join per ship so each exports as one node
-    def join(names, target):
-        bpy.ops.object.select_all(action="DESELECT")
-        for nme in names: bpy.data.objects[nme].select_set(True)
-        bpy.context.view_layer.objects.active = bpy.data.objects[target]
-        bpy.ops.object.join()
-        return bpy.data.objects[target]
-    a = join(["eff_cruiser", "eff_cruiser_pods", "eff_cruiser_stripe"], "eff_cruiser")
-    b = join(["zeon_cruiser", "zeon_cruiser_fins"], "zeon_cruiser")
-    c = join(["zeon_armor", "zeon_armor_skirt"], "zeon_armor")
-    export_glb(os.path.join(OUT, "ships.glb"), [a, b, c])
+    dome = obj_from_bm(dome_bm, "zeon_armor_d"); set_albedo(dome, lambda co, n: (0.30, 0.38, 0.30))
+    skirt = cyl_object("zeon_armor_s", [((0, 0, -6), 52, 10, "z", 58)], (0.24, 0.30, 0.24), segs=24)
+    groups["zeon_armor"] = [dome, skirt]
+    for k, objs in groups.items():
+        bake_ao_into_col(objs, distance=(26.0 if k != "eff_battleship" else 40.0))
+    ms = {}
+    for k, fac in (("eff_ms", "eff"), ("zeon_ms", "zeon")):
+        objs, eye = mobile_suit(k, fac)
+        bake_ao_into_col(objs, distance=1.8)
+        me = eye.data; alb = me.attributes["alb"]; col = me.attributes.new("Col", "FLOAT_COLOR", "POINT")
+        for i in range(len(me.vertices)): col.data[i].color = alb.data[i].color
+        me.attributes.remove(alb); me.color_attributes.active_color = me.color_attributes["Col"]
+        groups[k] = objs + [eye]
+    out = [join_objs(objs, k) for k, objs in groups.items()]
+    export_glb(os.path.join(OUT, "ships.glb"), out)
 
 
 # ============================================================ HERO SHIP ==
-# 蒼鷺號 Grey Heron — our own cruiser, seen up close in the chase view. Original design.
-# Blender: forward = -Y, up = +Z, metres. Exports with nose at glTF +Z (three.js lookAt convention).
+# 蒼鷺號 Grey Heron — our own ship: a mobile suit carrier-destroyer (original design), seen up close in chase view.
 def build_hero():
     print("hero", flush=True)
     reset()
-    GREY = (0.60, 0.61, 0.62); DARKG = (0.36, 0.37, 0.39); RED = (0.55, 0.13, 0.11)
-
-    def hull_col(co, n):
-        # panel variation + red band behind the nose + darker belly
-        cell = (math.floor(co.x / 7.0), math.floor(co.y / 9.0), math.floor(co.z / 5.0))
-        k = 0.88 + 0.16 * (hash3(cell) - 0.5)
-        if -78 < co.y < -66 and co.z > 0: return (RED[0] * k, RED[1] * k, RED[2] * k)
-        g = GREY if co.z > -4 else DARKG
-        return (g[0] * k, g[1] * k, g[2] * k)
-
-    def hash3(c):
-        v = math.sin(c[0] * 12.9898 + c[1] * 78.233 + c[2] * 37.719) * 43758.5453
-        return v - math.floor(v)
-
-    objs = []
-    hull = box_object("hero_hull", [
-        ((0, 0, 0), (30, 22, 210), (math.pi / 2, 0, 0), (0.45, 2.2)),          # main hull, nose -Y
-        ((0, 15, -14), (22, 12, 150), (math.pi / 2, 0, 0), (0.35, 1.6)),       # keel
-        ((0, 95, 2), (42, 30, 52), None, None),                                # engine block
-        ((16, -5, 0), (6, 26, 7), None, None), ((-16, -5, 0), (6, 26, 7), None, None),  # side sponsons
-        ((20, 80, -2), (16, 34, 6), None, None), ((-20, 80, -2), (16, 34, 6), None, None),  # nacelle pylons
-        ((0, 112, 18), (3, 26, 20), (0.35, 0, 0), None),                       # dorsal fin
-    ], GREY, cuts=4)
-    set_albedo(hull, hull_col); objs.append(hull)
+    TOP = (0.62, 0.63, 0.64); BEL = (0.32, 0.33, 0.35); RED = (0.58, 0.14, 0.12); BLUE = (0.17, 0.27, 0.52)
+    DARK = (0.05, 0.05, 0.06)
+    L, W, H, CY = 230.0, 34.0, 26.0, 10.0
+    KE, PE = 0.5, 1.8
+    PODX, PODY0, PODY1, PODZ = 37.0, -118.0, 52.0, -2.0      # catapult hangar pods
+    pod_len = PODY1 - PODY0; pod_cy = (PODY0 + PODY1) / 2
+    hull_parts = [
+        ((0, CY, 0), (W, H, L), ROT_FWD, (KE, PE)),                                  # central hull
+        ((0, -88, -9), (30, 12, 62), ROT_FWD, (0.12, 1.0)),                          # armoured ram prow
+        ((0, 20, -15), (22, 12, 150), ROT_FWD, (0.35, 1.6)),                         # keel
+        ((0, 118, 2), (60, 36, 52), None, None),                                     # engine block
+        ((0, 128, 26), (3, 30, 22), (0.4, 0, 0), None),                              # dorsal fin
+        ((0, 100, -26), (3, 40, 16), (-0.3, 0, 0), None),                            # ventral fin
+    ]
+    for sx in (-1, 1):
+        hull_parts += [((sx * 20, -40, PODZ), (8, 24, 6), None, None), ((sx * 20, 20, PODZ), (8, 24, 6), None, None),   # pod struts
+                       ((sx * 56, 112, 0), (26, 34, 2.6), (0, sx * 0.25, 0), None),                                      # stabilisers
+                       ((sx * 19, 62, 8), (6, 22, 7), None, None)]                                                       # CIWS sponsons
+    hull = box_object("hero_hull", hull_parts, TOP, cuts=4)
+    set_albedo(hull, panel_fn(TOP, BEL, RED, (-80, -70), cell=(7, 9, 5), belly_z=-4))
+    pods = box_object("hero_pods", [((sx * PODX, pod_cy, PODZ), (24, pod_len, 19), None, None) for sx in (-1, 1)] +
+                      [((sx * PODX, PODY0 + 4, PODZ + 9.6), (24.4, 8, 1.0), None, None) for sx in (-1, 1)], TOP, cuts=5)
+    set_albedo(pods, panel_fn(TOP, BEL, RED, (PODY0 - 1, PODY0 + 9), cell=(6, 10, 5), belly_z=PODZ - 2))
+    deck = box_object("hero_deck", [((sx * PODX, pod_cy, PODZ + 9.7), (5, pod_len - 6, 0.5), None, None) for sx in (-1, 1)] +
+                      [((sx * PODX, pod_cy + 10, PODZ + 9.7), (24.2, 3, 0.45), None, None) for sx in (-1, 1)], BLUE, cuts=0)
+    mouths = box_object("hero_mouths", [((sx * PODX, PODY0 - 0.25, PODZ), (19, 0.8, 14), None, None) for sx in (-1, 1)], DARK, cuts=0)
     tower = box_object("hero_tower", [
-        ((0, 26, 19), (14, 30, 16), None, (0.85, 1.0)),                        # tower
-        ((0, 19, 30), (26, 13, 7), None, None),                                # bridge head
-        ((0, 27, 39), (1.2, 1.2, 14), None, None), ((0, 27, 43), (10, 1, 1), None, None),  # mast + yard
-        ((0, 34, 30), (8, 6, 4), None, None),                                  # sensor block
-    ], (0.66, 0.66, 0.66), cuts=2)
-    set_albedo(tower, hull_col); objs.append(tower)
-    nac = cyl_object("hero_nacelles", [((30, 80, -2), 9, 92, "y", 9), ((-30, 80, -2), 9, 92, "y", 9),
-                                       ((30, 33, -2), 6, 6, "y", 9), ((-30, 33, -2), 6, 6, "y", 9)], (0.52, 0.53, 0.55), segs=16)
+        ((0, 44, 26), (17, 34, 22), None, (0.72, 1.0)),
+        ((0, 35, 39.5), (32, 13, 8), None, None),
+        ((0, 47, 45), (12, 8, 5), None, None),
+        ((0, 46, 52), (1.4, 1.4, 16), None, None), ((0, 46, 57), (12, 1, 1), None, None)], (0.68, 0.68, 0.68), cuts=2)
+    set_albedo(tower, panel_fn((0.68, 0.68, 0.68), (0.5, 0.5, 0.5), cell=(5, 6, 4)))
+    objs = [hull, pods, deck, mouths, tower]
+    nac = cyl_object("hero_nacelles", [((sx * 42, 98, -4), 10, 70, "y", 10) for sx in (-1, 1)], (0.50, 0.51, 0.53), segs=16)
     objs.append(nac)
-    # turrets: (base centre, facing up(+1)/down(-1))
-    TUR = [((0, -25, 9.3), 1), ((0, -60, 7.6), 1), ((0, -22, -21.5), -1)]
-    tparts, bparts, tips = [], [], []
-    for (c, s_) in TUR:
-        x, y, z = c
-        tparts.append(((x, y, z + s_ * 1.6), 6.5, 3.2, "z", 5.8))
-        bparts.append(((x, y - 1, z + s_ * 4.2), (10, 11, 4.2), None, None))
-        for bx in (-2.3, 2.3):
-            bparts.append(((x + bx, y - 11, z + s_ * 4.4), (1.3, 16, 1.3), None, None))
-            tips.append((x + bx, y - 19.5, z + s_ * 4.4))
-    tb = cyl_object("hero_turret_bases", tparts, DARKG, segs=14); objs.append(tb)
-    tt = box_object("hero_turrets", bparts, (0.48, 0.49, 0.50), cuts=1); objs.append(tt)
+    tc, tb, tips = [], [], []
+    for (y, big) in ((-30, True), (-62, True), (82, False)):
+        z = hull_top(H, L, y, KE, PE, cy=CY) if y < 60 else 20.5
+        c, b, t = turret_parts((0, y, z), 1, 1.9 if big else 1.25, 26 if big else 14)
+        tc += c; tb += b; tips += t
+    for sx in (-1, 1):  # CIWS
+        c, b, t = turret_parts((sx * 19, 62, 11.5), 1, 0.6, 6); tc += c; tb += b; tips += t
+    objs.append(cyl_object("hero_turret_bases", tc, (0.30, 0.31, 0.33), segs=14))
+    objs.append(box_object("hero_turrets", tb, (0.47, 0.48, 0.49), cuts=1))
     bake_ao_into_col(objs, distance=18.0)
 
-    # emissive parts (coloured at runtime): windows, engine nozzles, running lights
-    win = box_object("hero_windows", [((0, 12.35, 30.8), (22, 0.5, 1.8), None, None),
-                                      ((12.9, 19, 30.8), (0.5, 9, 1.8), None, None), ((-12.9, 19, 30.8), (0.5, 9, 1.8), None, None)], (1, 1, 1), cuts=0)
-    eng = cyl_object("hero_engines", [((30, 126.6, -2), 7.4, 1.2, "y", 7.4), ((-30, 126.6, -2), 7.4, 1.2, "y", 7.4),
-                                      ((-11, 121.4, 2), 6, 1.2, "y", 6), ((11, 121.4, 2), 6, 1.2, "y", 6)], (1, 1, 1), segs=16)
-    # port (+X) red, starboard (-X) green
-    LIGHTS = [((39.5, 80, -2), (1, 0.1, 0.1)), ((-39.5, 80, -2), (0.1, 1, 0.2)), ((0, 27, 46.5), (1, 1, 1)), ((0, 124, 30), (1, 1, 1))]
+    win = box_object("hero_windows", [((0, 28.35, 40), (29, 0.5, 2.2), None, None),
+                                      ((15.9, 35, 40), (0.5, 10, 2.2), None, None), ((-15.9, 35, 40), (0.5, 10, 2.2), None, None)], (1, 1, 1), cuts=0)
+    eng = cyl_object("hero_engines", [((sx * 42, 133.6, -4), 8.4, 1.2, "y", 8.4) for sx in (-1, 1)] +
+                     [((x, 144.6, z), 7.2, 1.2, "y", 7.2) for x in (-14, 14) for z in (-6, 10)], (1, 1, 1), segs=16)
+    LIGHTS = [((PODX + 12.6, 40, PODZ), (1, 0.1, 0.1)), ((-PODX - 12.6, 40, PODZ), (0.1, 1, 0.2)),   # port (+X) red, starboard green
+              ((0, 46, 61), (1, 1, 1)), ((0, 140, 38), (1, 1, 1))]
+    for sx in (-1, 1):  # catapult guide lights, amber, along each deck
+        for k in range(9):
+            LIGHTS.append(((sx * PODX + 3.5, PODY0 + 8 + k * 18, PODZ + 10.0), (1, 0.6, 0.15)))
+            LIGHTS.append(((sx * PODX - 3.5, PODY0 + 8 + k * 18, PODZ + 10.0), (1, 0.6, 0.15)))
     lb = bmesh.new()
     for (c, col) in LIGHTS:
-        tmp = bmesh.new(); bmesh.ops.create_cube(tmp, size=1.6)
+        tmp = bmesh.new(); bmesh.ops.create_cube(tmp, size=1.5)
         for v in tmp.verts: v.co += Vector(c)
         me = bpy.data.meshes.new("t"); tmp.to_mesh(me); tmp.free(); lb.from_mesh(me); bpy.data.meshes.remove(me)
     lights = obj_from_bm(lb, "hero_lights")
-    def lcol(co, n):
-        best = min(LIGHTS, key=lambda L: (Vector(L[0]) - co).length); return best[1]
-    set_albedo(lights, lcol)
+    set_albedo(lights, lambda co, n: min(LIGHTS, key=lambda Lt: (Vector(Lt[0]) - co).length)[1])
     for o in (win, eng, lights):
         me = o.data; alb = me.attributes["alb"]; col = me.attributes.new("Col", "FLOAT_COLOR", "POINT")
         for i in range(len(me.vertices)): col.data[i].color = alb.data[i].color
         me.attributes.remove(alb); me.color_attributes.active_color = me.color_attributes["Col"]
     export_glb(os.path.join(OUT, "hero.glb"), objs + [win, eng, lights])
     g = lambda p: [round(p[0], 2), round(p[2], 2), round(-p[1], 2)]  # Blender -> glTF
-    meta = {"length": 254, "gunTips": [g(t) for t in tips], "engines": [g((30, 128, -2)), g((-30, 128, -2)), g((-11, 123, 2)), g((11, 123, 2))],
-            "lights": [g(L[0]) + list(L[1]) for L in LIGHTS]}
+    meta = {"length": 265, "gunTips": [g(t) for t in tips],
+            "engines": [g((sx * 42, 136, -4)) for sx in (-1, 1)] + [g((x, 147, z)) for x in (-14, 14) for z in (-6, 10)],
+            "catapults": [g((sx * PODX, PODY0 + 30, PODZ + 3)) for sx in (-1, 1)],
+            "catapultExits": [g((sx * PODX, PODY0 - 4, PODZ + 3)) for sx in (-1, 1)]}
     with open(os.path.join(OUT, "hero.json"), "w") as f:
         json.dump(meta, f, separators=(",", ":"))
 

@@ -12,14 +12,33 @@ export const MIRROR_CENTER = [3000, 1100, 2400];     // Solar System mirror fiel
 export const MIRROR_RADIUS = 1800;
 export const DUEL_CENTER = [-5200, 1400, 400];       // S8: the distant duel, seen to port
 
-// Companion ships in our formation, offsets from our position (world axes).
+// Companion ships in our formation: offsets from our position (world axes), hull type.
+// Most sit ahead of us so they show in both the bridge window and the chase view.
 export const COMPANIONS = [
-  [-420, 60, -200],   // 0 — wingman, hit in S4
-  [600, -90, -150],
-  [-700, -120, 500],
-  [650, 140, -500],   // 3 — sunk by the mobile armour in S9
-  [160, 240, 800],
+  [-420, 60, -200, 'eff_cruiser'],      // 0 — wingman, hit in S4
+  [600, -90, -150, 'eff_cruiser'],
+  [-900, -160, -700, 'eff_cruiser'],
+  [650, 140, -500, 'eff_cruiser'],      // 3 — sunk by the mobile armour in S9
+  [250, 280, -1150, 'eff_cruiser'],
+  [-1150, 40, -1150, 'eff_battleship'], // 5+ always present
+  [1250, -220, -1500, 'eff_cruiser'],
+  [-250, -320, -2100, 'eff_cruiser'],
+  [950, 320, -2500, 'eff_battleship'],
+  [-1900, 220, -2700, 'eff_cruiser'],
 ];
+
+// Our mobile suit squad: formation slots in Grey Heron's local frame (x port, y up, z forward; bow ≈ z +122).
+export const ESCORT_SLOTS = [
+  [80, 40, 230], [-80, 40, 230], [150, -10, 160], [-150, 20, 105], [46, 75, 60], [-115, 85, 5],
+];
+export const ESCORT_LOST = { act: 3, at: 11.2, index: 3 };   // S4: one escort is shot down
+
+// Zeon mobile suit strafing runs past our ship: act index -> { t0, t1, n, kills (indices shot down), seed }
+export const RAIDS = {
+  2: { t0: 8.5, t1: 16, n: 3, kills: [0, 2], seed: 31 },
+  3: { t0: 0.8, t1: 15.5, n: 5, kills: [0, 1, 3], seed: 41 },
+  6: { t0: 2.5, t1: 16, n: 4, kills: [1, 2, 3], seed: 71 },
+};
 
 export const ACTS = [
   { id: 'S1', title: '序幕 — 要塞的沉默', en: 'Prologue — The Silent Fortress', hold: 20, cc: ['CANON'],
@@ -45,7 +64,8 @@ export const ACTS = [
     narrEn: 'Zeon mobile suits launch from the east and north faces. The Federation vanguard engages.',
     path: [[2000, 200, 13000], [1800, 180, 10400]], alert: true,
     comms: [
-      [3.5, '觀測', '要塞東面，MS 出擊！數量很多！', 'Mobile suits launching, east face — a lot of them!'],
+      [0.4, '甲板', 'MS 隊，彈射出擊！', 'Mobile suit team — launch!'],
+      [4.2, '觀測', '要塞東面，敵 MS 出擊！數量很多！', 'Enemy mobile suits launching, east face — a lot of them!'],
       [9.0, '通訊', '前鋒接敵——', 'Vanguard engaging—'],
       [13.5, '火控', '主砲，自由射擊。', 'Main guns, fire at will.'],
     ] },

@@ -28,6 +28,12 @@ v2 fixes that with five rules:
   scale anchor; near hits and the Solar System light the hull instead of the bridge, and our own
   turrets fire. Same timeline, so switching never changes what happens.
 
+**v2.2 fleet action:** Grey Heron is a mobile suit carrier-destroyer with twin catapult hangar pods.
+Its six-suit escort squad launches from the catapults in act 3 and flies formation; Zeon suits make
+strafing runs in acts 3, 4 and 7 and the escorts shoot most of them down (one escort is lost in act 4).
+The formation now has destroyers and battleships ahead of us. All hulls and mobile suits are original
+designs, drawn at anime scale (×1.8) so they read beside the ships.
+
 ## Controls
 
 Drag to look around (orbit the ship in chase view) · double-click to recentre · `C` switch view ·
