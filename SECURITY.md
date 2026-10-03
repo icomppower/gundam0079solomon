@@ -8,10 +8,8 @@ data**. There is nothing to breach on a server, because there is no server.
 
 The only third-party surface is:
 
-- **Three.js r128** and two of its example helpers (`OrbitControls`, `CSS2DRenderer`), vendored and version-pinned in
-  `lib/`.
-- **Map tiles** (elevation + satellite imagery) fetched once at setup from their public providers, then served as local
-  files. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- **Three.js r160** and a few of its example add-ons (GLTF loader, post-processing), vendored and version-pinned in
+  `lib/three/`. Nothing is loaded from a CDN at runtime. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Reporting a vulnerability
 

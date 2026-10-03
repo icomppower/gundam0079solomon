@@ -1,982 +1,157 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>所羅門攻略戰 · Battle of Solomon · U.C. 0079</title>
-<meta name="description" content="機動戰士高達 U.C. 0079 — 所羅門攻略戰。Three.js 單檔 3D 太空紀錄片，10 幕自播：聯邦艦隊集結、太陽系統發動、Big Zam 最後一戰、要塞陷落。Built on icomppower/space-engine." />
-<meta name="author" content="Johnny Lai — https://www.linkedin.com/in/icomppower/" />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="所羅門攻略戰 · Battle of Solomon · U.C. 0079" />
-<meta property="og:description" content="From-scratch single-file 3D space documentary on Three.js — 10-act auto-play of the Battle of Solomon." />
-<meta property="og:url" content="https://icomppower.github.io/gundam0079solomon/" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23000308'/><circle cx='8' cy='8' r='3' fill='%23f5c46b'/></svg>" />
+<meta name="description" content="A fan visit to the Battle of Solomon, U.C. 0079 — watched from the bridge of a Federation cruiser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2l3 9 9-2-6 7 6 7-9-2-3 9-3-9-9 2 6-7-6-7 9 2z' fill='%23c9a45c'/%3E%3C/svg%3E">
 <style>
-  :root{
-    --ink:#dfe6f0; --ink-dim:#8aa0bc; --void:#000308;
-    --amber:#f5c46b; --amber-glow:rgba(245,196,107,.55);
-    --blue:#86b9ff; --blue-glow:rgba(134,185,255,.55);
-    --panel:rgba(8,12,20,.72); --edge:rgba(140,180,240,.22);
-    --mono:"SFMono-Regular",Consolas,ui-monospace,monospace;
-    --sans:"Inter","Noto Sans TC","Helvetica Neue",Arial,system-ui,sans-serif;
+  :root {
+    --ink: #e9e4d8; --dim: #9a968c; --gold: #c9a45c; --green: #7fe0b4; --red: #ff6a5a;
+    --panel: rgba(8, 10, 14, .62); --line: rgba(233, 228, 216, .14);
+    --serif: "Noto Serif TC", "Songti TC", "PMingLiU", "MingLiU", serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  @media (prefers-reduced-motion: reduce){ *{ animation-duration:.001ms !important; transition-duration:.001ms !important; } }
-  html,body{width:100%;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font-family:var(--sans)}
-  #scene{position:fixed;inset:0;z-index:0}
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); overflow: hidden; font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #view:active { cursor: grabbing; }
+  .layer { position: fixed; inset: 0; pointer-events: none; }
+  #fade { background: #000; opacity: 1; }
+  #white { background: #fffdf6; opacity: 0; mix-blend-mode: screen; }
 
-  /* overlays that `h` toggles */
-  .overlay{transition:opacity .4s ease}
-  body.bare .overlay{opacity:0}
+  /* ---------- title screen ---------- */
+  #title { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 60%, #0d1220 0%, #020306 70%); z-index: 20; transition: opacity 1.2s ease; }
+  #title.gone { opacity: 0; pointer-events: none; }
+  .t-wrap { width: min(560px, 88vw); text-align: center; }
+  .t-kicker { font: 500 11px/1 var(--mono); letter-spacing: .32em; color: var(--gold); text-transform: uppercase; }
+  .t-h { font: 600 clamp(40px, 9vw, 72px)/1.05 var(--serif); margin: 18px 0 6px; letter-spacing: .06em; }
+  .t-en { font: 400 13px/1.5 var(--mono); letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+  .t-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); margin: 28px auto; width: 70%; opacity: .6; }
+  .t-p { font-size: 15px; line-height: 1.75; color: #cfcabe; margin: 0 0 6px; }
+  .t-p small { display: block; color: var(--dim); font-size: 12.5px; line-height: 1.6; margin-top: 4px; }
+  .t-ship { font: 500 12px/1 var(--mono); color: var(--green); letter-spacing: .14em; margin-top: 18px; }
+  .t-btns { display: flex; gap: 10px; justify-content: center; margin-top: 28px; flex-wrap: wrap; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  .b-main { font: 600 15px/1 var(--sans); letter-spacing: .12em; padding: 15px 30px; border: 1px solid var(--gold); color: #12100c; background: var(--gold); }
+  .b-main:hover { background: #dcb86c; }
+  .b-alt { font: 500 13px/1 var(--sans); letter-spacing: .1em; padding: 15px 22px; border: 1px solid var(--line); color: var(--dim); }
+  .b-alt:hover { color: var(--ink); border-color: var(--dim); }
+  button:disabled { opacity: .35; cursor: wait; }
+  #loading { margin-top: 22px; font: 11px/1 var(--mono); color: var(--dim); letter-spacing: .15em; }
+  #loading.gone { visibility: hidden; }
+  .bar { height: 2px; width: 160px; margin: 10px auto 0; background: var(--line); }
+  #loadbar { height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+  .t-keys { margin-top: 26px; font: 11px/1.8 var(--mono); color: #6e6b64; letter-spacing: .06em; }
+  .t-fan { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; font: 10.5px/1.6 var(--mono); color: #5d5a54; padding: 0 16px; }
 
-  /* act title — top-left */
-  #act{position:fixed;left:22px;top:20px;z-index:3;pointer-events:none;
-    font:600 13px/1.4 var(--mono);letter-spacing:.16em;text-transform:uppercase;
-    color:var(--amber);text-shadow:0 0 10px var(--amber-glow),0 1px 3px #000}
-  #act .n{color:var(--ink-dim);font-weight:400;margin-right:8px}
+  /* ---------- HUD ---------- */
+  #hud { opacity: 0; transition: opacity 1s; }
+  #hud.on { opacity: 1; }
+  body.nohud #hud { opacity: 0 !important; }
+  #act { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 18px; font: 500 11px/1 var(--mono); color: var(--dim); letter-spacing: .14em; }
+  #act b { color: var(--gold); font-weight: 600; margin-right: 8px; }
+  #keys { position: fixed; top: max(16px, env(safe-area-inset-top)); right: 18px; font: 10.5px/1 var(--mono); color: #77746d; letter-spacing: .08em; }
+  #keys kbd { font: inherit; color: var(--ink); opacity: .8; margin: 0 3px 0 10px; }
+  #card { position: fixed; top: 30%; left: 0; right: 0; text-align: center; opacity: 0; text-shadow: 0 2px 18px #000; }
+  #card-n { font: 500 11px/1 var(--mono); letter-spacing: .36em; color: var(--gold); }
+  #card-t { font: 600 clamp(30px, 5.6vw, 52px)/1.15 var(--serif); margin: 14px 0 8px; letter-spacing: .08em; }
+  #card-e { font: 400 12px/1 var(--mono); letter-spacing: .24em; color: #b7b2a6; text-transform: uppercase; }
+  .subs { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(760px, 92vw); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  #comms { opacity: 0; text-align: center; text-shadow: 0 1px 10px #000, 0 0 2px #000; }
+  #comms-w { font: 600 10.5px/1 var(--mono); color: #0b1410; background: var(--green); padding: 3px 6px; letter-spacing: .18em; vertical-align: 3px; margin-right: 8px; }
+  #comms-t { font: 500 clamp(16px, 2.3vw, 19px)/1.5 var(--sans); }
+  #comms-e { display: block; font: 13px/1.5 var(--sans); color: #b9b5aa; font-style: italic; margin-top: 2px; }
+  #narr { opacity: 0; background: var(--panel); border-left: 2px solid var(--gold); padding: 11px 16px 12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); width: 100%; }
+  #narr-t { font: 400 15px/1.7 var(--serif); }
+  #narr-e { font: 12px/1.55 var(--sans); color: var(--dim); margin-top: 3px; }
+  #cc { float: right; margin: 0 0 4px 10px; }
+  .cc { font: 600 9.5px/1 var(--mono); letter-spacing: .14em; padding: 3px 5px; margin-left: 4px; border: 1px solid; }
+  .cc.canon { color: #8fd4a0; } .cc.variant { color: #e8b86a; } .cc.supp { color: #9fb8e8; }
+  .transport { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); width: min(760px, 92vw); display: flex; align-items: center; gap: 14px; pointer-events: auto; }
+  .transport button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; font-size: 12px; color: var(--ink); background: rgba(0,0,0,.35); flex: none; }
+  .transport button.off { color: var(--dim); }
+  #prog { position: relative; flex: 1; height: 22px; cursor: pointer; touch-action: none; }
+  #prog::before { content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: rgba(255,255,255,.14); }
+  #fill { position: absolute; left: 0; top: 10px; height: 2px; background: var(--gold); }
+  #ticks i { position: absolute; top: 7px; width: 1px; height: 8px; background: rgba(255,255,255,.3); }
+  #clock { font: 11px/1 var(--mono); color: var(--dim); min-width: 78px; text-align: right; flex: none; }
+  .credit { position: fixed; right: 16px; bottom: calc(4px + env(safe-area-inset-bottom)); font: 10px/1 var(--mono); color: #5f5c56; letter-spacing: .08em; }
 
-  /* narration band — bottom-center */
-  #narr{position:fixed;left:50%;bottom:74px;z-index:3;transform:translateX(-50%);
-    width:min(820px,90vw);text-align:center;pointer-events:none}
-  #cc{display:block;margin-bottom:10px;line-height:1}
-  .cc{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.72rem;
-    font-weight:700;margin:0 3px;letter-spacing:.08em;font-family:var(--mono)}
-  .cc.canon{background:#1b5e20;color:#fff;} .cc.variant{background:#e65100;color:#fff;}
-  .cc.supp{background:#1a237e;color:#fff;} .cc.staging{background:#4a148c;color:#fff;}
-  #ntxt{display:inline-block;font:400 15px/1.7 var(--sans);color:var(--ink);
-    letter-spacing:.02em;text-shadow:0 1px 6px #000,0 0 18px rgba(0,0,0,.8);
-    background:var(--panel);padding:7px 16px;border-radius:4px;
-    border:1px solid var(--edge);backdrop-filter:blur(3px)}
+  /* ---------- end card ---------- */
+  #end { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.72); opacity: 0; pointer-events: none; transition: opacity 1.6s; z-index: 15; text-align: center; }
+  #end.on { opacity: 1; pointer-events: auto; }
+  #end h2 { font: 600 clamp(28px, 5vw, 44px)/1.2 var(--serif); margin: 14px 0 8px; letter-spacing: .08em; }
+  #end p { color: var(--dim); font-size: 13.5px; line-height: 1.8; margin: 4px 0; }
+  #end .next { font: 500 11px/1 var(--mono); color: var(--gold); letter-spacing: .3em; }
+  #end .b-alt { margin-top: 24px; }
 
-  /* transport — play · time-scrubber · clock · music, bottom-center */
-  #controls{position:fixed;left:50%;bottom:24px;z-index:3;transform:translateX(-50%);
-    width:min(760px,88vw);display:flex;align-items:center;gap:12px;pointer-events:auto}
-  body.bare #controls{pointer-events:none}
-  #controls button{flex:0 0 auto;background:var(--panel);color:var(--ink);
-    border:1px solid var(--edge);border-radius:50%;width:34px;height:34px;cursor:pointer;
-    font-family:var(--mono);transition:color .2s,border-color .2s}
-  #controls button:hover{color:var(--amber);border-color:var(--amber)}
-  #play{font-size:13px}
-  #music-btn{font-size:14px}
-  #music-btn.off{opacity:.55}
-  #prog{flex:1;height:6px;border-radius:3px;background:rgba(140,180,240,.18);
-    position:relative;cursor:pointer;touch-action:none}
-  #prog > i{display:block;height:100%;width:0;border-radius:3px;
-    background:linear-gradient(90deg,var(--blue),var(--amber));box-shadow:0 0 8px var(--amber-glow)}
-  #prog .ticks{position:absolute;inset:0;pointer-events:none}
-  #prog .ticks b{position:absolute;top:-3px;width:2px;height:12px;border-radius:1px;
-    background:rgba(140,180,240,.42);transform:translateX(-50%)}
-  #prog .knob{position:absolute;top:50%;left:0;width:12px;height:12px;border-radius:50%;
-    background:var(--amber);box-shadow:0 0 8px var(--amber-glow);transform:translate(-50%,-50%);pointer-events:none}
-  #time{flex:0 0 auto;font:500 11px/1 var(--mono);color:var(--ink-dim);letter-spacing:.05em;
-    min-width:82px;text-align:right;font-variant-numeric:tabular-nums}
-
-  /* control hint — top-right, hidden by `h` */
-  #hint{position:fixed;right:18px;top:18px;z-index:3;font:400 11px/1.6 var(--mono);
-    color:var(--ink-dim);letter-spacing:.04em;pointer-events:none;text-align:right;
-    text-shadow:0 1px 3px #000}
-  #hint b{color:var(--ink);font-weight:600}
-
-  /* creator credit — REQUIRED on every deploy; stays visible when `h` is pressed */
-  #credit{position:fixed;right:16px;bottom:12px;z-index:4;
-    font:500 11px/1.4 var(--mono);letter-spacing:.05em;
-    color:var(--ink-dim);text-shadow:0 1px 3px #000}
-  #credit a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--edge);
-    pointer-events:auto;transition:color .2s,border-color .2s}
-  #credit a:hover{color:var(--amber);border-color:var(--amber)}
-
-  #boot{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;
-    background:var(--void);color:var(--ink-dim);font:400 12px/1.6 var(--mono);letter-spacing:.18em;
-    text-transform:uppercase;transition:opacity .6s ease}
-  #boot.gone{opacity:0;pointer-events:none}
+  @media (max-width: 640px) {
+    #keys { display: none; }
+    #narr-e { display: none; }
+    #narr-t { font-size: 13.5px; }
+    .subs { bottom: calc(68px + env(safe-area-inset-bottom)); }
+    .credit { display: none; }
+  }
 </style>
 </head>
 <body>
-  <div id="scene"></div>
+<canvas id="view"></canvas>
+<audio id="bgm" loop preload="auto" src="lib/Rise of the Iron Vanguard.mp3"></audio>
+<div class="layer" id="white"></div>
+<div class="layer" id="fade"></div>
 
-  <div id="act" class="overlay"></div>
-
-  <div id="hint" class="overlay">
-    <b>拖曳</b> 旋轉 &nbsp;·&nbsp; <b>滾輪</b> 縮放 &nbsp;·&nbsp; <b>SPACE</b> 暫停 &nbsp;·&nbsp; <b>← →</b> 切幕 &nbsp;·&nbsp; <b>H</b> 隱藏
+<div id="hud" class="layer">
+  <div id="act"></div>
+  <div id="keys"><kbd>拖曳</kbd>環顧 <kbd>雙擊</kbd>回正 <kbd>SPACE</kbd>暫停 <kbd>← →</kbd>切幕 <kbd>H</kbd>隱藏 <kbd>M</kbd>聲音</div>
+  <div id="card"><div id="card-n"></div><div id="card-t"></div><div id="card-e"></div></div>
+  <div class="subs">
+    <div id="comms"><span id="comms-w"></span><span id="comms-t"></span><span id="comms-e"></span></div>
+    <div id="narr"><span id="cc"></span><div id="narr-t"></div><div id="narr-e"></div></div>
   </div>
-
-  <div id="narr" class="overlay"><span id="cc"></span><span id="ntxt"></span></div>
-
-  <div id="controls" class="overlay">
-    <button id="play" title="播放／暫停 Play / pause" aria-label="Play / pause">⏸</button>
-    <div id="prog" role="slider" aria-label="時間軸 Timeline"><i></i><div class="ticks"></div><div class="knob"></div></div>
-    <span id="time">0:00 / 0:00</span>
-    <button id="music-btn" class="off" title="音樂 Music" aria-label="Background music">🔇</button>
+  <div class="transport">
+    <button id="play" aria-label="play / pause">❚❚</button>
+    <div id="prog" aria-label="timeline"><div id="ticks"></div><div id="fill"></div></div>
+    <div id="clock">0:00 / 3:30</div>
+    <button id="mute" class="off" aria-label="sound">🔇</button>
   </div>
+  <div class="credit">Built by Johnny Lai · icomppower</div>
+</div>
 
-  <div id="credit"><a href="https://www.linkedin.com/in/icomppower/" target="_blank" rel="noopener">Built by Johnny Lai · icomppower</a></div>
+<div id="title">
+  <div class="t-wrap">
+    <div class="t-kicker">U.C. 0079 · 一年戰爭 · Part 2 / 3</div>
+    <div class="t-h">所羅門攻略戰</div>
+    <div class="t-en">Battle of Solomon</div>
+    <div class="t-rule"></div>
+    <p class="t-p">你站在聯邦巡洋艦的艦橋上。<br>窗外，是所羅門。
+      <small>You are standing on the bridge of a Federation cruiser. Outside the window is Solomon.</small></p>
+    <div class="t-ship">▸ <span id="ship-name"></span> · 第二聯合艦隊</div>
+    <div class="t-btns">
+      <button class="b-main" id="board" disabled>登艦 · Board</button>
+      <button class="b-alt" id="board-quiet" disabled>靜音觀看 · Muted</button>
+    </div>
+    <div id="loading">LOADING<div class="bar"><div id="loadbar"></div></div></div>
+    <div class="t-keys">拖曳環顧艦橋 · drag to look around · 約 3 分 30 秒</div>
+  </div>
+  <div class="t-fan">Fan work. Mobile Suit Gundam © Sotsu · Sunrise. Not affiliated. The cruiser, its crew and all hulls shown are original designs.</div>
+</div>
 
-  <!-- Music: Rise of the Iron Vanguard — committed to lib/. Muted autoplay (in sync); a deliberate click unmutes. -->
-  <audio id="bgm" loop muted preload="auto" src="lib/Rise of the Iron Vanguard.mp3"></audio>
+<div id="end">
+  <div>
+    <div class="next">PART 3 · A BAOA QU · 待續</div>
+    <h2>所羅門陷落</h2>
+    <p>要塞改名コンペイトウ。聯邦軍的下一站，是 A Baoa Qu。</p>
+    <p>Narrated History Map · Gundam 0079 trilogy · Built by Johnny Lai · icomppower</p>
+    <button class="b-alt" id="replay">重新觀看 · Replay</button>
+  </div>
+</div>
 
-  <div id="boot">Initialising void…</div>
-
-<!-- Three.js r128, single script from cdnjs (no bundler, no build step) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<!-- r128 postprocessing addons (bloom) — attach to the global THREE, no bundler needed -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script>
-/* ============================================================================
- * 所羅門攻略戰 · BATTLE OF SOLOMON · U.C. 0079
- * Single-file 3D space documentary — built on icomppower/space-engine.
- * ----------------------------------------------------------------------------
- * Real star sphere · nebula · sun · distant Earth/Luna backdrop · Solomon
- * asteroid fortress as scene origin [0,0,0]. A SCENES[] player auto-plays 10
- * acts: per-scene camera tween (2.4s) + hold, multi-unit keyframe tracks,
- * st:dead vaporise FX, Solar System beam, faction colours + emblems, CC chips.
- * No external assets · no build step · no 2D map · no timeline scrubber.
- * ==========================================================================*/
-
-/* ---------------------------------------------------------------- CFG ----- */
-const CFG = {
-  starCount : 9000,
-  starShell : [6200, 9600],
-  sunDir    : [1.0, 0.34, 0.55],
-  // Solomon — the subject, at origin. Sized so the authored fleet tracks clear
-  // its hull (with the radial clamp below they never fly through it).
-  solomonSize : 30,
-  // distant backdrop (dim, never steals the frame — the battle is the subject)
-  earthPos  : [-1700, -260, -2500], earthSize: 120,
-  // Luna ORBITS Earth (moonPivot at Earth's centre) — not a fixed corridor point
-  moonOrbit : 340, moonSize : 26, moonTilt : 0.42,
-  // deep-corridor backdrops — Solomon → A Baoa Qu → Side 3 receding into the
-  // Zeon-deep distance (the way Zeon retreats in S10). A Baoa Qu is the far gate:
-  // moderate size + long distance so it reads as distant, not looming over Solomon.
-  abaoaquPos : [-780, 70, -900], abaoaquSize : 46,
-  side3Pos   : [-1080, 110, -1240],
-};
-
-/* ----------------------------------------- factions (colour + emblem) -----
- * Locked 2026-07-01 visual language: SIDE colour (eff/zeon) marks the faction,
- * PLACE colour (solomon/abaoaqu) marks the fortress. `glow` is the emissive/
- * trail/engine tint that blooms; `hull` is the matte body.                    */
-const FACTION = {
-  eff:  { hull:0x8c98a8, light:0x9fd0ff, core:0x9fd0ff, glow:0x9fd0ff, emblem:'EFF'  }, // 聯邦 — 冷藍鋼／藍光
-  zeon: { hull:0x6b6258, light:0xffb63c, core:0xffc861, glow:0x7dffa0, emblem:'ZEON' }, // 吉翁 — 綠光
-  solomon: { hull:0x9a7a4a, glow:0xffcf6a },   // place colour — 琥珀 amber
-  abaoaqu: { hull:0x6a5a9a, glow:0xb59aff },   // place colour — 紫 violet
-};
-function rgbStr(hex){ const c=new THREE.Color(hex); return `${(c.r*255)|0},${(c.g*255)|0},${(c.b*255)|0}`; }
-for(const k in FACTION){ const F=FACTION[k]; F.gs = rgbStr(F.glow);
-  if(F.light!=null) F.ls = rgbStr(F.light); if(F.hull!=null) F.hs = rgbStr(F.hull); }
-
-/* --------------------------------------------------------- tiny utils ----- */
-function mulberry32(seed){
-  let a = seed >>> 0;
-  return function(){
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-// radial-gradient sprite from a fresh canvas (one-offs: sun, nebula, fortress core)
-function radialSprite(stops, size, opacity){
-  const c = document.createElement('canvas'); c.width = c.height = 256;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(128,128,0, 128,128,128);
-  stops.forEach(([o, col]) => g.addColorStop(o, col));
-  ctx.fillStyle = g; ctx.fillRect(0,0,256,256);
-  const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity,
-    blending: THREE.AdditiveBlending, depthWrite: false });
-  const sp = new THREE.Sprite(mat); sp.scale.set(size, size, 1);
-  return sp;
-}
-// cached radial textures (re-used every frame for trails / explosions / engine glow)
-const _texCache = {};
-function glowTex(key, stops){
-  if(_texCache[key]) return _texCache[key];
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(64,64,0, 64,64,64);
-  stops.forEach(([o,col]) => g.addColorStop(o,col));
-  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
-  const tex = new THREE.CanvasTexture(c); tex._shared = true; _texCache[key] = tex;
-  return tex;
-}
-function makeSprite(tex, size, opacity){
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity,
-    blending: THREE.AdditiveBlending, depthWrite: false });
-  const sp = new THREE.Sprite(mat); sp.scale.set(size, size, 1);
-  return sp;
-}
-
-/* ========================================================== 1 · RENDERER == */
-const sceneEl = document.getElementById('scene');
-const scene   = new THREE.Scene();
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setClearColor(0x000308, 1);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-sceneEl.appendChild(renderer.domElement);
-
-const camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 1, 40000);
-const sunDir = new THREE.Vector3(...CFG.sunDir).normalize();
-
-/* bloom pipeline — low threshold so only emissive/basic surfaces glow, matte
- * standard-material hulls stay dark. Ported from the space-engine schematic. */
-const composer = new THREE.EffectComposer(renderer);
-composer.addPass(new THREE.RenderPass(scene, camera));
-const bloomPass = new THREE.UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.5, 0.45);
-composer.addPass(bloomPass);
-
-/* ========================================================= 2 · STAR FIELD = */
-function buildStars(){
-  const n = CFG.starCount, [inner, outer] = CFG.starShell;
-  const pos=new Float32Array(n*3), col=new Float32Array(n*3),
-        size=new Float32Array(n), phase=new Float32Array(n);
-  const rnd = mulberry32(90791), c = new THREE.Color();
-  for(let i=0;i<n;i++){
-    const u = rnd()*2-1, th = rnd()*Math.PI*2, s = Math.sqrt(1-u*u);
-    const r = inner + rnd()*(outer-inner);
-    pos[i*3]=r*s*Math.cos(th); pos[i*3+1]=r*u; pos[i*3+2]=r*s*Math.sin(th);
-    const t = rnd();
-    const hue = t<0.12 ? 0.58 : (t>0.90 ? 0.07 : 0.6);
-    const sat = t<0.12||t>0.90 ? 0.5 : 0.06;
-    c.setHSL(hue, sat, 0.55 + rnd()*0.45);
-    col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
-    size[i]=(rnd()*rnd())*7+1.4; phase[i]=rnd();
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  geo.setAttribute('color',    new THREE.BufferAttribute(col,3));
-  geo.setAttribute('aSize',    new THREE.BufferAttribute(size,1));
-  geo.setAttribute('aPhase',   new THREE.BufferAttribute(phase,1));
-  const mat = new THREE.ShaderMaterial({
-    uniforms:{ uTime:{value:0}, uPix:{value:renderer.getPixelRatio()} },
-    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, vertexColors:true,
-    vertexShader:`attribute float aSize; attribute float aPhase; varying vec3 vColor;
-      uniform float uTime; uniform float uPix;
-      void main(){ vColor=color;
-        float tw=0.65+0.35*sin(uTime*1.7+aPhase*6.2831853);
-        vec4 mv=modelViewMatrix*vec4(position,1.0);
-        gl_PointSize=aSize*tw*uPix*(340.0/-mv.z);
-        gl_Position=projectionMatrix*mv; }`,
-    fragmentShader:`varying vec3 vColor;
-      void main(){ float d=length(gl_PointCoord-vec2(0.5));
-        float a=smoothstep(0.5,0.0,d); gl_FragColor=vec4(vColor,a*a); }`,
-  });
-  const stars = new THREE.Points(geo, mat); stars.frustumCulled = false;
-  scene.add(stars); return mat;
-}
-const starMat = buildStars();
-
-/* ============================================================ 3 · NEBULA == */
-(function(){
-  const neb = new THREE.Group();
-  [ { col:'rgba(60,90,200,',  pos:[-1800,600,-3200], size:5200, op:0.10 },
-    { col:'rgba(170,60,150,', pos:[2400,-900,-2600], size:4200, op:0.08 },
-    { col:'rgba(40,140,170,', pos:[-800,-1400,2800], size:4600, op:0.07 },
-  ].forEach(c=>{ const sp=radialSprite([[0,c.col+'1)'],[0.5,c.col+'0.25)'],[1,c.col+'0)']],c.size,c.op);
-    sp.position.set(...c.pos); neb.add(sp); });
-  scene.add(neb);
-})();
-
-/* =============================================================== 4 · SUN == */
-const sunLight = new THREE.DirectionalLight(0xfff2dd, 2.2);
-sunLight.position.copy(sunDir).multiplyScalar(4000); scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x1a2634, 0.42));   // low fill so v2 hull terminator reads under bloom
-(function(){
-  const g = new THREE.Group(); g.position.copy(sunDir.clone().multiplyScalar(7000));
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(120,24,24), new THREE.MeshBasicMaterial({color:0xfff6e6})));
-  g.add(radialSprite([[0,'rgba(255,250,235,1)'],[0.25,'rgba(255,225,160,0.7)'],[1,'rgba(255,180,90,0)']],2600,0.9));
-  scene.add(g);
-})();
-
-/* ============================================ 5 · distant Earth / Luna =====
- * buildEarth: matte (roughness 1.0) blue backdrop + a thin high-power Fresnel
- * atmosphere. Matte on purpose — a shiny Earth blooms into a "flashlight"
- * artifact under UnrealBloomPass. Ported from the space-engine schematic.     */
-function earthTexture(seed){
-  const W=1024,H=512,c=document.createElement('canvas'); c.width=W;c.height=H;
-  const ctx=c.getContext('2d'), rnd=mulberry32(seed);
-  const og=ctx.createLinearGradient(0,0,0,H);
-  og.addColorStop(0,'#0a2742'); og.addColorStop(0.5,'#0e3a63'); og.addColorStop(1,'#0a2540');
-  ctx.fillStyle=og; ctx.fillRect(0,0,W,H);
-  const land=['#3c6b40','#4f7a45','#6e7a48','#8a7a52'];
-  const centers=[[170,210],[300,300],[510,180],[600,330],[760,250],[880,160],[120,360]];
-  ctx.save();
-  for(const [cx,cy] of centers){
-    const col=land[(rnd()*land.length)|0];
-    ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=22;
-    const blobs=10+(rnd()*10|0);
-    for(let b=0;b<blobs;b++){
-      const r=14+rnd()*38, x=cx+(rnd()-0.5)*140, y=cy+(rnd()-0.5)*90;
-      ctx.beginPath(); ctx.ellipse(x,y,r,r*(0.7+rnd()*0.5),rnd()*6.28,0,6.28); ctx.fill();
-    }
-  }
-  ctx.restore();
-  ctx.save(); ctx.fillStyle='#c8d8e8'; ctx.shadowColor='#c8d8e8'; ctx.shadowBlur=24;
-  for(let x=-40;x<W+40;x+=70){
-    ctx.beginPath(); ctx.ellipse(x,4,55,20,0,0,6.28); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x,H-4,55,20,0,0,6.28); ctx.fill();
-  }
-  ctx.restore();
-  return new THREE.CanvasTexture(c);
-}
-function buildEarth(size){
-  const grp = new THREE.Group();
-  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size,64,48),
-    new THREE.MeshStandardMaterial({ map:earthTexture(1337), roughness:1.0, metalness:0.0 })));
-  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size*1.015,64,48), new THREE.ShaderMaterial({
-    side:THREE.BackSide, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false,
-    uniforms:{ uColor:{ value:new THREE.Color(0x6fb0ff) } },
-    vertexShader:`varying vec3 vN; varying vec3 vP;
-      void main(){ vN=normalize(normalMatrix*normal);
-        vP=normalize((modelViewMatrix*vec4(position,1.0)).xyz);
-        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-    fragmentShader:`varying vec3 vN; varying vec3 vP; uniform vec3 uColor;
-      void main(){ float f=pow(1.0-abs(dot(vN,vP)),28.0); gl_FragColor=vec4(uColor,f*0.35); }`,
-  })));
-  return grp;
-}
-const earth = buildEarth(CFG.earthSize);
-earth.position.set(...CFG.earthPos); scene.add(earth);
-
-// Luna — orbits Earth on a tilted pivot at Earth's centre (a moving body).
-function moonTexture(seed){
-  const W=512,H=256,c=document.createElement('canvas'); c.width=W;c.height=H;
-  const ctx=c.getContext('2d'), rnd=mulberry32(seed);
-  ctx.fillStyle='#9a9a93'; ctx.fillRect(0,0,W,H);
-  for(let i=0;i<70;i++){
-    const x=rnd()*W, y=rnd()*H, r=4+rnd()*30, dark=rnd()<0.4, base=dark?110:150;
-    const g=ctx.createRadialGradient(x,y,0,x,y,r);
-    g.addColorStop(0,`rgb(${base-30},${base-30},${base-34})`);
-    g.addColorStop(0.8,`rgb(${base},${base},${base-6})`); g.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-  }
-  return new THREE.CanvasTexture(c);
-}
-const moonPivot = new THREE.Object3D();
-moonPivot.position.set(...CFG.earthPos); moonPivot.rotation.x = CFG.moonTilt; scene.add(moonPivot);
-const luna = new THREE.Mesh(new THREE.SphereGeometry(CFG.moonSize,48,36),
-  new THREE.MeshPhongMaterial({ map:moonTexture(424242), shininess:2 }));
-luna.position.set(CFG.moonOrbit, 0, 0); moonPivot.add(luna);
-
-// Side 3 — Zeon homeland, deepest along the corridor. A faint dot cluster.
-const side3 = new THREE.Group(); side3.position.set(...CFG.side3Pos);
-(function(){
-  const rnd = mulberry32(311);
-  const colonyMat = new THREE.MeshStandardMaterial({ color:0xc8ccd6, roughness:0.35, metalness:0.7 });
-  for(let i=0;i<12;i++){
-    const len=10+rnd()*18, rad=1.6+rnd()*3;
-    const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,12), colonyMat);
-    m.position.set((rnd()-0.5)*180,(rnd()-0.5)*110,(rnd()-0.5)*180);
-    m.rotation.set(rnd()*Math.PI,rnd()*Math.PI,rnd()*Math.PI); side3.add(m);
-  }
-  const np=70, sp=new Float32Array(np*3);
-  for(let i=0;i<np;i++){ sp[i*3]=(rnd()-0.5)*230; sp[i*3+1]=(rnd()-0.5)*140; sp[i*3+2]=(rnd()-0.5)*230; }
-  const sg=new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp,3));
-  side3.add(new THREE.Points(sg, new THREE.PointsMaterial({ color:0x9fc4ff, size:2.4,
-    transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false })));
-})();
-scene.add(side3);
-
-/* ============================================== 6 · buildFortress() factory ==
- * v2 Death-Star-style: panel-textured sphere hull (matte MeshStandard, stays
- * dark under bloom) + equatorial trench (dark torus + thin emissive strip) +
- * offset superlaser-style dish. Solomon and A Baoa Qu share this shape and
- * differ ONLY by place colour (amber vs violet). Lit elements are MeshBasic so
- * UnrealBloomPass blooms the glow, never the hull.
- * Tagged nodes 'trenchGlow' + 'reactorCore' let S10 swap Zeon→EFF on capture. */
-function panelTexture(hullHex){
-  const w=512,h=256,c=document.createElement('canvas'); c.width=w;c.height=h;
-  const ctx=c.getContext('2d'), hull=new THREE.Color(hullHex);
-  ctx.fillStyle=`rgb(${(hull.r*90)|0},${(hull.g*90)|0},${(hull.b*90)|0})`; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle='rgba(0,0,0,0.4)';
-  for(let x=0;x<w;x+=20){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-  for(let y=0;y<h;y+=20){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
-}
-function buildFortress({ size=40, place='solomon' }){
-  const F = FACTION[place], glow = F.glow, grp = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({ map:panelTexture(F.hull), color:0xffffff, roughness:0.85, metalness:0.2 });
-  grp.add(new THREE.Mesh(new THREE.SphereGeometry(size,72,54), hullMat));
-  const trench = new THREE.Mesh(new THREE.TorusGeometry(size*1.001, size*0.045, 8, 96),
-    new THREE.MeshStandardMaterial({ color:0x0c0c0c, roughness:1 }));
-  trench.rotation.x = Math.PI/2; grp.add(trench);
-  const trenchGlow = new THREE.Mesh(new THREE.TorusGeometry(size*1.001, size*0.013, 6, 96),
-    new THREE.MeshBasicMaterial({ color:glow }));
-  trenchGlow.rotation.x = Math.PI/2; trenchGlow.name='trenchGlow'; grp.add(trenchGlow);
-  const dishDir = new THREE.Vector3(0.35,0.82,0.45).normalize();
-  const dish = new THREE.Mesh(new THREE.CylinderGeometry(size*0.26,size*0.30,size*0.05,28),
-    new THREE.MeshStandardMaterial({ color:0x2b2b28, roughness:0.6, metalness:0.4 }));
-  dish.position.copy(dishDir).multiplyScalar(size*1.01);
-  dish.lookAt(dishDir.clone().multiplyScalar(size*2)); grp.add(dish);
-  const dishCore = new THREE.Mesh(new THREE.SphereGeometry(size*0.05,14,14), new THREE.MeshBasicMaterial({color:glow}));
-  dishCore.position.copy(dishDir).multiplyScalar(size*1.10); dishCore.name='reactorCore'; grp.add(dishCore);
-  return grp;
-}
-
-// A Baoa Qu — the gate beyond Solomon, same shape, violet. Distant backdrop on
-// the Zeon-deep side of the corridor (where Zeon retreats toward in S10).
-const abaoaqu = buildFortress({ size:CFG.abaoaquSize, place:'abaoaqu' });
-abaoaqu.position.set(...CFG.abaoaquPos); scene.add(abaoaqu);
-
-/* ====================================================== 7 · unit builders ==
- * Ported from the space-engine schematic: primitive-hull fleet ships and small
- * humanoid mobile suits, faction-coloured, oriented so their nose faces -Z (the
- * travel direction the SCENES player aims each unit down via lookAt).          */
-function buildShip(factionKey, scale){
-  const F = FACTION[factionKey], grp = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.7, metalness:0.3, flatShading:true });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.8,9,8), mat);
-  body.rotation.x = Math.PI/2; grp.add(body);          // long axis along Z, wide end (-Z) = bow
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(1.3,2.6,8), mat);
-  nose.rotation.x = -Math.PI/2; nose.position.z = -5.8; grp.add(nose);
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,1.2), mat);
-  bridge.position.set(0,1.6,0.6); grp.add(bridge);
-  const eng = makeSprite(glowTex('eng-'+factionKey,
-    [[0,'rgba(255,255,255,1)'],[0.4,`rgba(${F.gs},1)`],[1,`rgba(${F.gs},0)`]]), 3.4, 0.9);
-  eng.position.z = 4.9; grp.add(eng);                  // engine glow at the stern (+Z)
-  if(scale) grp.scale.setScalar(scale);
-  return grp;
-}
-function buildFleet(factionKey, count){
-  const g = new THREE.Group(), rnd = mulberry32(count*131 + (FACTION[factionKey].hull&0xff));
-  for(let i=0;i<count;i++){
-    const s = buildShip(factionKey);
-    s.position.set((rnd()-0.5)*22, (rnd()-0.5)*9, (rnd()-0.5)*22);
-    s.rotation.y = (rnd()-0.5)*0.4;
-    g.add(s);
-  }
-  return g;
-}
-function buildMobileSuit(factionKey, scale){
-  const F = FACTION[factionKey], grp = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color:F.hull, roughness:0.6, metalness:0.35, flatShading:true });
-  const accent = new THREE.MeshStandardMaterial({ color:F.glow, roughness:0.4, metalness:0.5,
-    emissive:F.glow, emissiveIntensity:0.35 });     // shoulders / eye / v-fin — pops under bloom
-  grp.add(new THREE.Mesh(new THREE.BoxGeometry(0.9,1.1,0.6), mat));       // torso
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28,10,8), mat); head.position.y=0.75; grp.add(head);
-  const vfin = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.4,4), accent);
-  vfin.position.set(0,0.98,-0.05); vfin.rotation.x=0.3; grp.add(vfin);    // faces -Z (travel dir)
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), accent);
-  eye.position.set(0,0.75,-0.26); grp.add(eye);
-  for(const s of [-1,1]){
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.9,6), mat);
-    arm.position.set(s*0.62,0.05,0); grp.add(arm);
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.14,0.9,6), mat);
-    leg.position.set(s*0.24,-1.0,0); grp.add(leg);
-    const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.28,0.32), accent);
-    shoulder.position.set(s*0.62,0.5,0); grp.add(shoulder);
-  }
-  grp.scale.setScalar(2.2*(scale||1));
-  return grp;
-}
-function emblemSprite(F){
-  const c=document.createElement('canvas'); c.width=c.height=128; const ctx=c.getContext('2d');
-  ctx.clearRect(0,0,128,128);
-  const col = F.emblem==='EFF' ? '#9fd0ff' : '#7dffa0';
-  ctx.strokeStyle=col; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(64,64,40,0,Math.PI*2); ctx.stroke();
-  ctx.fillStyle=col; ctx.font='bold 30px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(F.emblem, 64, 66);
-  const tex=new THREE.CanvasTexture(c);
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0.95,depthWrite:false}));
-  sp.scale.set(9,9,1); sp.name='emblem'; return sp;
-}
-/* Solar System — canon-corrected reflector array (flat white panels, NO barrel/
- * muzzle). The 'charge' sprite is what the S5/S6 player ramps and pulses.      */
-function buildSolarSystemFlat(size, hex){
-  const grp = new THREE.Group();
-  const panelMat = new THREE.MeshStandardMaterial({ color:0xf2f2f0, roughness:0.55, metalness:0.05, side:THREE.DoubleSide });
-  const gridMat = new THREE.LineBasicMaterial({ color:0xaab0bb, transparent:true, opacity:0.5 });
-  const nPanels = 5;
-  for(let i=0;i<nPanels;i++){
-    const a = (i-(nPanels-1)/2)*0.18;
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(size*0.34, size*1.5), panelMat);
-    panel.position.set(Math.sin(a)*size*0.55, 0, -Math.cos(a)*size*0.55*0.3); panel.rotation.y=a; grp.add(panel);
-    const wire = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.PlaneGeometry(size*0.34, size*1.5, 3, 8)), gridMat);
-    wire.position.copy(panel.position); wire.rotation.copy(panel.rotation); grp.add(wire);
-  }
-  const focal = new THREE.Mesh(new THREE.SphereGeometry(size*0.05,10,10), new THREE.MeshBasicMaterial({ color:hex }));
-  focal.position.z = size*0.9; grp.add(focal);
-  const charge = makeSprite(glowTex('solar',
-    [[0,'rgba(190,235,255,1)'],[0.4,'rgba(120,190,255,0.5)'],[1,'rgba(120,190,255,0)']]), size*0.9, 0.0);
-  charge.name='charge'; grp.add(charge);
-  grp.userData.solar = true;
-  return grp;
-}
-
-/* motion trail — fading ring-buffer line behind a moving unit (additive, blooms) */
-function makeTrail(color, length){
-  const N = length, positions = new Float32Array(N*3), alphas = new Float32Array(N);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
-  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphas,1));
-  const mat = new THREE.ShaderMaterial({
-    uniforms:{ uColor:{ value:new THREE.Color(color) } },
-    vertexShader:`attribute float aAlpha; varying float vA;
-      void main(){ vA=aAlpha; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader:`varying float vA; uniform vec3 uColor;
-      void main(){ gl_FragColor=vec4(uColor, vA); }`,
-    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending });
-  const line = new THREE.Line(geo, mat); line.frustumCulled = false;
-  const pts = [];
-  return { line, push(v){
-    pts.push(v.clone()); if(pts.length>N) pts.shift();
-    for(let i=0;i<N;i++){ const p = pts[i] || pts[0] || v;
-      positions[i*3]=p.x; positions[i*3+1]=p.y; positions[i*3+2]=p.z;
-      alphas[i] = pts[i] ? (i/(N-1))*0.85 : 0; }
-    geo.attributes.position.needsUpdate = true; geo.attributes.aAlpha.needsUpdate = true;
-  } };
-}
-/* permanent path-so-far — dashed "plotted course" of the WHOLE track, revealed
- * progressively via setDrawRange, plus waypoint pins dropped along the way.    */
-function makePathSoFar(curve, color, samples){
-  samples = samples || 120;
-  const pos = new Float32Array(samples*3);
-  curve.getSpacedPoints(samples-1).forEach((p,i)=>{ pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z; });
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  geo.setDrawRange(0,0);
-  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({
-    color, dashSize:6, gapSize:4, transparent:true, opacity:0.5 }));
-  line.computeLineDistances(); line.frustumCulled = false;
-  const markers = new THREE.Group();
-  return { line, markers, samples, color, lastMarkerP:-1 };
-}
-
-const TRAIL_KINDS = new Set(['fleet','command','hero-ms','ms']);
-const PATH_KINDS  = new Set(['fleet','command','hero-ms']);
-// units never penetrate Solomon — anything closer than CLEAR is pushed out to
-// the hull shell (assault units "land" on the surface instead of clipping in).
-const CLAMP_KINDS = new Set(['fleet','command','hero-ms','ms']);
-const CLEAR = CFG.solomonSize + 6;
-
-function buildUnit(u){
-  const F = FACTION[u.faction];
-  switch(u.kind){
-    case 'fortress':  return buildFortress({ size:CFG.solomonSize, place:'solomon' }); // Solomon place-colour (amber)
-    case 'fleet':     return buildFleet(u.faction, 6);
-    case 'command':   { const c = buildShip(u.faction, 2.0); c.add(emblemSprite(F)); return c; }
-    case 'ms':        return buildMobileSuit(u.faction);
-    case 'hero-ms':   { const m = buildMobileSuit(u.faction, 1.3); m.userData.hero = true; return m; }
-    case 'artillery': return buildSolarSystemFlat(60, 0xf2f2f0);
-  }
-  return new THREE.Group();
-}
-
-/* ============================================================ 8 · SCENES == */
-/* Coordinates are the Scene Script 3D xyz tables. Solomon = origin [0,0,0].
- * Y depth layers: fortress/fleet/command≈0 · ms≈18 · hero-ms≈24 · artillery≈40. */
-const SCENES = [
-  { id:'S1', title:'序幕 — 要塞的沉默', hold:20, cc:['CANON'],
-    narr:'奧德薩之後，吉翁全面收縮宇宙；所羅門是最後防線之一。雷比爾將軍集結艦隊，矛頭直指要塞。',
-    cam:{ pos:[130,75,150], look:[0,5,0] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Zeon 巡邏 MS', kind:'ms', faction:'zeon', track:[[36,18,36],[-36,18,-36],[0,18,36]] },
-      { n:'聯邦偵察機', kind:'ms', faction:'eff', track:[[132,18,132],[-144,18,-132]] },
-    ] },
-  { id:'S2', title:'聯邦集結', hold:18, cc:['CANON','VARIANT'],
-    narr:'第一、第二聯合艦隊兩翼包抄逼近，白色基地隨隊推進；道森提督啟動所羅門防禦配置。',
-    cam:{ pos:[185,80,120], look:[10,5,-10] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'第一聯合艦隊', kind:'fleet', faction:'eff', track:[[132,0,0],[60,0,0]] },
-      { n:'第一艦隊 MS隊', kind:'ms', faction:'eff', track:[[120,18,36],[48,18,36]] },
-      { n:'第二聯合艦隊', kind:'fleet', faction:'eff', track:[[-132,0,-132],[-60,0,-60]] },
-      { n:'白色基地', kind:'command', faction:'eff', track:[[-120,0,-96],[-48,0,-36]] },
-      { n:'Zeon 警戒線', kind:'ms', faction:'zeon', track:[[48,18,0],[72,18,0]] },
-    ] },
-  { id:'S3', title:'第一波接觸', hold:16, cc:['CANON','SUPP'],
-    narr:'吉翁 MS 由要塞東、北面出擊，聯邦前鋒接敵，首批交火爆發。',
-    cam:{ pos:[150,55,110], look:[50,15,15] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[0,18,84],[24,18,60]] },
-      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[60,18,0],[84,18,0]] },
-      { n:'聯邦前鋒 MS', kind:'ms', faction:'eff', track:[[96,18,36],[48,18,24]], dead:true, deadDelay:0.7 },
-      { n:'聯邦前鋒艦', kind:'fleet', faction:'eff', track:[[108,0,0],[60,0,0]] },
-    ] },
-  { id:'S4', title:'防禦圈全面激活', hold:16, cc:['CANON'],
-    narr:'南圈 MS 加入，多層防禦圈成形；兩翼聯邦艦隊同步施壓，戰線全面拉開。',
-    cam:{ pos:[40,115,165], look:[0,8,0] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', track:[[0,18,-84],[-24,18,-60]] },
-      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[24,18,60],[36,18,48]] },
-      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[84,18,0],[96,18,0]] },
-      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[60,0,0],[48,0,0]] },
-      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-60,0,-60],[-48,0,-48]] },
-      { n:'白色基地', kind:'command', faction:'eff', track:[[-48,0,-36],[-36,0,-24]] },
-    ] },
-  { id:'S5', title:'太陽系統展開', hold:15, cc:['CANON'],
-    narr:'聯邦巨型反射砲陣列「太陽系統」於高側翼展開充能，戰場短暫陷入靜默。',
-    cam:{ pos:[205,95,205], look:[70,28,70] },
-    units:[
-      { n:'太陽系統陣列', kind:'artillery', faction:'eff', at:[144,40,132] },
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', track:[[96,18,0],[100,18,0]] },
-      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', track:[[36,18,48],[40,18,44]] },
-      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', track:[[-24,18,-60],[-20,18,-56]] },
-      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[48,0,0],[46,0,0]] },
-      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-48,0,-48],[-46,0,-46]] },
-    ] },
-  { id:'S6', title:'太陽系統發動', hold:22, cc:['CANON'], beam:true,
-    narr:'光束橫掃，吉翁外圈 MS 由外至內逐批蒸發；所羅門防線在數秒間崩潰。',
-    cam:{ pos:[195,75,55], look:[50,18,25] },
-    units:[
-      { n:'太陽系統陣列', kind:'artillery', faction:'eff', at:[144,40,132], fire:true },
-      { n:'Zeon 東圈 MS', kind:'ms', faction:'zeon', at:[100,18,0], dead:true, deadDelay:0.30 },
-      { n:'Zeon 北圈 MS', kind:'ms', faction:'zeon', at:[40,18,44], dead:true, deadDelay:0.45 },
-      { n:'Zeon 南圈 MS', kind:'ms', faction:'zeon', at:[-20,18,-56], dead:true, deadDelay:0.62 },
-      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[46,0,0],[36,0,0]] },
-      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-46,0,-46],[-36,0,-36]] },
-    ] },
-  { id:'S7', title:'防線崩潰突破', hold:16, cc:['CANON'],
-    narr:'聯邦乘勢突入要塞外圍，白色基地衝向側翼，吉翁殘兵後退收縮。',
-    cam:{ pos:[95,65,135], look:[-15,10,15] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[24,0,0],[-12,0,0]] },
-      { n:'聯邦第一 MS隊', kind:'ms', faction:'eff', track:[[36,18,36],[-12,18,60]] },
-      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-36,0,-36],[-24,0,-12]] },
-      { n:'白色基地', kind:'command', faction:'eff', track:[[-48,0,-36],[-24,0,12]] },
-      { n:'Zeon 殘兵', kind:'ms', faction:'zeon', track:[[48,18,0],[12,18,0]] },
-      { n:'Zeon 殘艦', kind:'fleet', faction:'zeon', track:[[36,0,-12],[12,0,-12]] },
-    ] },
-  { id:'S8', title:'Elmeth 出擊與殞落', hold:25, cc:['CANON'],
-    narr:'拉拉蘇駕 Elmeth 高速孤線掠出，鋼彈截擊；新人類的感應，在死亡邊緣初次共鳴。',
-    cam:{ pos:[30,55,150], look:[45,22,75] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Elmeth（拉拉蘇）', kind:'hero-ms', faction:'zeon', track:[[-24,24,36],[96,24,108]], dead:true, deadDelay:0.92 },
-      { n:'鋼彈（阿姆羅）', kind:'hero-ms', faction:'eff', track:[[0,24,60],[60,24,84]] },
-      { n:'聯邦主艦隊', kind:'fleet', faction:'eff', track:[[-12,0,0],[-18,0,0]] },
-      { n:'Zeon 守備 MS', kind:'ms', faction:'zeon', track:[[12,18,12],[12,18,0]] },
-    ] },
-  { id:'S9', title:'ドズル最後一戰', hold:20, cc:['CANON'],
-    narr:'道森乘 Big Zam 單騎出擊，掩護艦隊撤退；聯邦集火之下，巨人戰死陣前。',
-    cam:{ pos:[100,42,95], look:[25,8,14] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0] },
-      { n:'Big Zam', kind:'command', faction:'zeon', track:[[0,6,12],[36,6,12],[48,6,12]], dead:true, deadDelay:0.9 },
-      { n:'聯邦前鋒艦 A', kind:'fleet', faction:'eff', at:[12,0,12], dead:true, deadDelay:0.5 },
-      { n:'聯邦前鋒艦 B', kind:'fleet', faction:'eff', at:[24,0,24], dead:true, deadDelay:0.62 },
-      { n:'聯邦 MS 反擊', kind:'ms', faction:'eff', track:[[24,18,36],[36,18,24]] },
-    ] },
-  { id:'S10', title:'所羅門陷落', hold:18, cc:['CANON'],
-    narr:'要塞易手，改名「コンペイトウ」。吉翁殘艦向暗處逃逸，聯邦兵鋒已指向 A Baoa Qu。',
-    cam:{ pos:[145,82,160], look:[0,5,0] },
-    units:[
-      { n:'所羅門要塞', kind:'fortress', faction:'zeon', at:[0,0,0], capture:true },
-      { n:'聯邦第一艦隊', kind:'fleet', faction:'eff', track:[[-18,0,0],[-24,0,0]] },
-      { n:'聯邦第二艦隊', kind:'fleet', faction:'eff', track:[[-24,0,-12],[-12,0,-24]] },
-      { n:'聯邦 MS 佔領隊', kind:'ms', faction:'eff', track:[[-12,18,24],[0,18,24]] },
-      { n:'Zeon 撤退艦 A', kind:'fleet', faction:'zeon', track:[[12,0,0],[-132,0,-144]] },
-      { n:'Zeon 撤退艦 B', kind:'fleet', faction:'zeon', track:[[-12,0,-12],[-144,0,-120]] },
-    ] },
-];
-
-/* ====================================================== 9 · FX (pooled) ==== */
-const stage = new THREE.Group(); scene.add(stage);
-const fxList = [], beamList = [], trailList = [];
-
-function disposeObj(o){
-  o.traverse(n=>{
-    if(n.geometry) n.geometry.dispose();
-    if(n.material){ const arr = Array.isArray(n.material) ? n.material : [n.material];
-      arr.forEach(m=>{ if(m.map && !m.map._shared) m.map.dispose(); m.dispose(); }); }
-  });
-}
-function spawnExplosion(pos, faction){
-  const sp = makeSprite(glowTex('boom', [[0,'rgba(255,244,210,1)'],[0.3,'rgba(255,170,80,0.85)'],[1,'rgba(255,120,40,0)']]), 5, 1);
-  sp.position.copy(pos); stage.add(sp);
-  fxList.push({ sp, t:0, life:1.1, max:40 });
-  // debris sparks
-  const sk = makeSprite(glowTex('spark', [[0,'rgba(255,230,180,1)'],[1,'rgba(255,180,90,0)']]), 2, 0.9);
-  sk.position.copy(pos); stage.add(sk);
-  fxList.push({ sp:sk, t:0, life:0.6, max:14 });
-}
-function spawnBeam(from, to){
-  const dir = new THREE.Vector3().subVectors(to, from), len = dir.length();
-  const geo = new THREE.CylinderGeometry(1.8, 1.8, len, 8, 1, true);
-  const mat = new THREE.MeshBasicMaterial({ color:0xddf2ff, transparent:true, opacity:0,
-    blending:THREE.AdditiveBlending, depthWrite:false });
-  const beam = new THREE.Mesh(geo, mat);
-  beam.position.copy(from).add(to).multiplyScalar(0.5);
-  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
-  stage.add(beam); beamList.push({ beam, mat, t:0, life:1.6 });
-}
-function updateFx(dt){
-  for(let i=fxList.length-1;i>=0;i--){ const f=fxList[i]; f.t+=dt; const k=f.t/f.life;
-    if(k>=1){ stage.remove(f.sp); disposeObj(f.sp); fxList.splice(i,1); continue; }
-    const s=5+k*f.max; f.sp.scale.set(s,s,1); f.sp.material.opacity=1-k; }
-  for(let i=beamList.length-1;i>=0;i--){ const b=beamList[i]; b.t+=dt; const k=b.t/b.life;
-    if(k>=1){ stage.remove(b.beam); disposeObj(b.beam); beamList.splice(i,1); continue; }
-    b.mat.opacity=Math.sin(Math.min(k,1)*Math.PI)*0.9; }
-  for(let i=trailList.length-1;i>=0;i--){ const tr=trailList[i]; tr.t+=dt; const k=tr.t/tr.life;
-    if(k>=1){ stage.remove(tr.sp); trailList.splice(i,1); continue; }
-    tr.sp.material.opacity=(1-k)*0.5; tr.sp.scale.setScalar(5*(1-k*0.5)); }
-}
-
-/* ================================================== 10 · SCENES PLAYER ===== */
-const overlay = { act:document.getElementById('act'), cc:document.getElementById('cc'),
-  ntxt:document.getElementById('ntxt') };
-const CCMAP = { CANON:'canon', VARIANT:'variant', SUPP:'supp', STAGING:'staging' };
-
-let si = -1, phase = 0, paused = false;
-const camFrom = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
-const camTo   = { pos:new THREE.Vector3(), look:new THREE.Vector3() };
-const curLook = new THREE.Vector3();
-let liveUnits = [], sceneArrayPos = null;
-
-function easeIO(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
-function dur(S){ return 2.4 + S.hold; }
-
-/* ---- transport: play/pause · time-scrubber · clock · muted-autoplay music ----
- * ORBIT keeps the camera slowly circling the look target through each hold, so
- * the frame glides instead of freezing dead after the 2.4s establishing tween. */
-const UP = new THREE.Vector3(0,1,0), _camOff = new THREE.Vector3();
-const ORBIT = 0.024;                                   // rad/s idle orbit during the hold
-// manual free-look: drag to orbit, wheel to zoom — applied on top of the scripted
-// camera each frame (works while playing OR paused). baseCamPos = scripted base.
-let userYaw = 0, userPitch = 0, userZoom = 1;
-const _uv = new THREE.Vector3(), _rv = new THREE.Vector3(), baseCamPos = new THREE.Vector3();
-function applyView(){                                   // scripted base → user offset → look
-  camera.position.copy(baseCamPos);
-  if(userYaw!==0 || userPitch!==0 || userZoom!==1){
-    const off = _uv.subVectors(camera.position, curLook).applyAxisAngle(UP, userYaw);
-    const right = _rv.crossVectors(UP, off);
-    if(right.lengthSq() > 1e-8){ right.normalize(); off.applyAxisAngle(right, userPitch); }
-    off.multiplyScalar(userZoom);
-    camera.position.copy(curLook).add(off);
-  }
-  camera.lookAt(curLook);
-}
-const DURS = SCENES.map(dur);
-const TOTAL = DURS.reduce((a,b)=>a+b, 0);
-const CUM = []; DURS.reduce((a,d,i)=>{ CUM[i]=a; return a+d; }, 0);   // scene start times
-function fmtT(s){ s=Math.max(0,Math.floor(s)); return ((s/60)|0)+':'+String(s%60).padStart(2,'0'); }
-function elapsedT(){ return si>=0 ? CUM[si] + Math.min(phase, DURS[si]) : 0; }
-
-const progEl   = document.getElementById('prog');
-const fillEl   = progEl.querySelector('i');
-const knobEl   = progEl.querySelector('.knob');
-const timeEl   = document.getElementById('time');
-const playBtn  = document.getElementById('play');
-const bgm      = document.getElementById('bgm'); bgm.volume = 0.55;
-const musicBtn = document.getElementById('music-btn');
-let soundOn = false, scrubbing = false;
-
-(function(){ const t=progEl.querySelector('.ticks');   // one tick per act boundary
-  CUM.forEach((c,i)=>{ if(i===0) return; const b=document.createElement('b'); b.style.left=(c/TOTAL*100)+'%'; t.appendChild(b); }); })();
-
-function paintTransport(fr, tsec){
-  fillEl.style.width = (fr*100)+'%'; knobEl.style.left = (fr*100)+'%';
-  timeEl.textContent = fmtT(tsec)+' / '+fmtT(TOTAL);
-}
-function updateTransport(){ if(scrubbing) return; const t=elapsedT(); paintTransport(TOTAL?t/TOTAL:0, t); }
-function updatePlayBtn(){ playBtn.textContent = paused ? '▶' : '⏸'; }
-function paintMusic(){ musicBtn.textContent = soundOn ? '🔊' : '🔇'; musicBtn.classList.toggle('off', !soundOn); }
-function syncMusic(){ if(soundOn && !paused) bgm.play().catch(()=>{}); else bgm.pause(); }
-
-playBtn.onclick  = ()=>{ paused=!paused; updatePlayBtn(); syncMusic(); };
-musicBtn.onclick = ()=>{ soundOn=!soundOn; bgm.muted=!soundOn; paintMusic(); syncMusic(); };
-
-// scrub to seek — preview live during the drag, commit (rebuild the act) on release
-function fracFromEvent(ev){ const r=progEl.getBoundingClientRect(); return Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)); }
-function seekTo(fr){ const t=fr*TOTAL; let idx=SCENES.length-1;
-  for(let i=0;i<SCENES.length;i++){ if(t < CUM[i]+DURS[i]){ idx=i; break; } }
-  enterScene(idx); phase = Math.min(Math.max(0, t-CUM[idx]), DURS[idx]-0.01); syncMusic(); }
-progEl.addEventListener('pointerdown', e=>{ scrubbing=true; progEl.setPointerCapture(e.pointerId);
-  const fr=fracFromEvent(e); paintTransport(fr, fr*TOTAL); });
-progEl.addEventListener('pointermove', e=>{ if(!scrubbing) return; const fr=fracFromEvent(e); paintTransport(fr, fr*TOTAL); });
-progEl.addEventListener('pointerup', e=>{ if(!scrubbing) return; scrubbing=false; seekTo(fracFromEvent(e)); });
-progEl.addEventListener('pointercancel', ()=>{ scrubbing=false; });
-
-function clearStage(){
-  for(let i=stage.children.length-1;i>=0;i--){ const c=stage.children[i]; stage.remove(c); disposeObj(c); }
-  liveUnits.length=0; fxList.length=0; beamList.length=0; trailList.length=0;
-}
-function setOverlay(S, idx){
-  overlay.act.innerHTML = `<span class="n">${S.id} / ${SCENES.length}</span>${S.title}`;
-  overlay.cc.innerHTML = S.cc.map(c=>`<span class="cc ${CCMAP[c]}">${c}</span>`).join('');
-  overlay.ntxt.textContent = S.narr;
-}
-function enterScene(idx){
-  si = idx; phase = 0;
-  const S = SCENES[idx];
-  clearStage();
-  camFrom.pos.copy(baseCamPos); camFrom.look.copy(curLook);
-  camTo.pos.set(...S.cam.pos); camTo.look.set(...S.cam.look);
-  sceneArrayPos = null;
-  const D = dur(S);
-  for(const u of S.units){
-    const obj = buildUnit(u);
-    let curve = null, start;
-    if(u.track){
-      const pts = u.track.map(p=>new THREE.Vector3(...p));
-      start = pts[0].clone();
-      if(pts.length>=2){ curve = new THREE.CatmullRomCurve3(pts); curve.curveType='catmullrom'; curve.tension=0.4; }
-    } else { start = new THREE.Vector3(...u.at); }
-    obj.position.copy(start);
-    if(u.kind==='artillery'){ sceneArrayPos = start.clone(); obj.lookAt(0,10,0); } // aim the reflector at the battle
-    stage.add(obj);
-    const lu = { u, obj, curve, dead:!!u.dead,
-      deadAt:(u.deadDelay!=null?u.deadDelay:0.85)*D, exploded:false, captured:false };
-    // motion trail + permanent path-so-far for moving units (two-layer read:
-    // glowing trail = "where it is now", dashed path = "the whole route").
-    if(curve){
-      const gc = FACTION[u.faction].glow;
-      if(TRAIL_KINDS.has(u.kind)){ lu.trail = makeTrail(gc, 44); stage.add(lu.trail.line); }
-      if(PATH_KINDS.has(u.kind)){ lu.path = makePathSoFar(curve, gc);
-        stage.add(lu.path.line); stage.add(lu.path.markers); }
-    }
-    liveUnits.push(lu);
-  }
-  setOverlay(S, idx);
-}
-
-function playUpdate(dt){
-  if(si<0) return;
-  const S = SCENES[si], D = dur(S);
-  phase += dt;
-  // camera: 2.4s establishing tween, then a slow continuous orbit through the
-  // hold (alternating direction per act) so the shot glides instead of freezing.
-  const e = easeIO(Math.min(1, phase/2.4));
-  camera.position.lerpVectors(camFrom.pos, camTo.pos, e);
-  curLook.lerpVectors(camFrom.look, camTo.look, e);
-  if(phase > 2.4){
-    const ot = phase - 2.4, dir = (si % 2) ? 1 : -1;
-    _camOff.subVectors(camTo.pos, camTo.look).applyAxisAngle(UP, ot * ORBIT * dir);
-    camera.position.copy(camTo.look).add(_camOff);
-    camera.position.y += Math.sin(ot * 0.45) * 2.0;   // gentle vertical bob for life
-  }
-  baseCamPos.copy(camera.position);                   // scripted base; applyView() adds free-look + lookAt
-  const p = easeIO(Math.min(1, phase/D));
-  for(const lu of liveUnits){
-    if(lu.curve){ lu.curve.getPoint(p, lu.obj.position);
-      // face direction of travel
-      const ahead = lu.curve.getPoint(Math.min(1, p+0.02));
-      if(ahead.distanceToSquared(lu.obj.position)>1e-4) lu.obj.lookAt(ahead);
-    }
-    // keep units outside Solomon's hull — no fly-through (assault units hug the shell)
-    if(CLAMP_KINDS.has(lu.u.kind)){
-      const d2 = lu.obj.position.lengthSq();
-      if(d2 > 1e-6 && d2 < CLEAR*CLEAR) lu.obj.position.multiplyScalar(CLEAR/Math.sqrt(d2));
-    }
-    // solar array charge / fire
-    if(lu.u.kind==='artillery'){
-      const ch = lu.obj.getObjectByName('charge');
-      if(ch) ch.material.opacity = lu.u.fire ? (0.3+0.7*Math.abs(Math.sin(phase*4))) : Math.min(0.6, phase/2.4*0.6);
-    }
-    // glowing motion trail + dashed path-so-far (revealed as the unit advances)
-    if(lu.trail && lu.obj.visible) lu.trail.push(lu.obj.position);
-    if(lu.path){
-      lu.path.line.geometry.setDrawRange(0, Math.max(2, Math.floor(p*lu.path.samples)));
-      if(p - lu.path.lastMarkerP > 0.12){
-        lu.path.lastMarkerP = p;
-        const pin = new THREE.Mesh(new THREE.SphereGeometry(1.6,8,8),
-          new THREE.MeshBasicMaterial({ color:lu.path.color, transparent:true, opacity:0.7 }));
-        pin.position.copy(lu.obj.position); lu.path.markers.add(pin);
-      }
-    }
-    // st:dead vaporise
-    if(lu.dead && !lu.exploded && phase>=lu.deadAt){
-      lu.exploded = true;
-      if(sceneArrayPos) spawnBeam(sceneArrayPos.clone(), lu.obj.position.clone());
-      spawnExplosion(lu.obj.position.clone(), lu.u.faction);
-      lu.obj.visible = false;
-    }
-    // S10 capture — Solomon changes hands: trench + dish glow turn EFF-blue,
-    // Federation emblem raised (renamed コンペイトウ in the narration).
-    if(lu.u.capture && !lu.captured && phase > D*0.5){
-      lu.captured = true;
-      const eff = FACTION.eff.glow;
-      const tg = lu.obj.getObjectByName('trenchGlow'); if(tg) tg.material.color.set(eff);
-      const rc = lu.obj.getObjectByName('reactorCore'); if(rc) rc.material.color.set(eff);
-      const em = emblemSprite(FACTION.eff);     // float above the solid hull so it reads
-      em.position.set(0, 56, 0); em.scale.set(20,20,1); lu.obj.add(em);
-    }
-  }
-  if(phase >= D) enterScene((si+1) % SCENES.length);
-}
-
-/* ===================================================== 11 · CONTROLS ======= */
-window.addEventListener('keydown', e=>{
-  if(e.key==='h'||e.key==='H') document.body.classList.toggle('bare');
-  else if(e.code==='Space'){ e.preventDefault(); paused=!paused; updatePlayBtn(); syncMusic(); }
-  else if(e.key==='ArrowRight') enterScene((si+1)%SCENES.length);
-  else if(e.key==='ArrowLeft') enterScene((si-1+SCENES.length)%SCENES.length);
-});
-/* ---- free-look: drag to orbit · wheel to zoom · double-click to reset ------ */
-const dom = renderer.domElement; dom.style.cursor = 'grab';
-let dragging=false, lastX=0, lastY=0;
-dom.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY;
-  dom.style.cursor='grabbing'; dom.setPointerCapture(e.pointerId); });
-dom.addEventListener('pointermove', e=>{ if(!dragging) return;
-  userYaw   -= (e.clientX-lastX)*0.005;
-  userPitch += (e.clientY-lastY)*0.005;
-  userPitch  = Math.max(-1.2, Math.min(1.2, userPitch));
-  lastX=e.clientX; lastY=e.clientY; });
-function endDrag(){ dragging=false; dom.style.cursor='grab'; }
-dom.addEventListener('pointerup', endDrag);
-dom.addEventListener('pointercancel', endDrag);
-dom.addEventListener('wheel', e=>{ e.preventDefault();
-  userZoom *= (1 + Math.sign(e.deltaY)*0.08);
-  userZoom  = Math.max(0.45, Math.min(2.4, userZoom)); }, { passive:false });
-dom.addEventListener('dblclick', ()=>{ userYaw=0; userPitch=0; userZoom=1; });   // reset the view
-
-window.addEventListener('resize', ()=>{
-  camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  starMat.uniforms.uPix.value = renderer.getPixelRatio();
-});
-
-/* ========================================================= 12 · LOOP ======= */
-const clock = new THREE.Clock();
-// opening: start pulled back so S1 tween eases in
-camera.position.set(210, 120, 240); curLook.set(0,0,0); camera.lookAt(curLook);
-baseCamPos.copy(camera.position);   // seed the scripted base before the first scene
-
-function animate(){
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  if(!paused) playUpdate(dt);
-  applyView();                       // free-look offset + lookAt — runs even while paused
-  updateFx(dt);
-  // backdrop motion — Earth spins, Luna orbits it, the fortresses idle-rotate
-  earth.rotation.y   += dt*0.01;
-  moonPivot.rotation.y += dt*0.05;   // Luna's orbit around Earth
-  luna.rotation.y    += dt*0.02;
-  abaoaqu.rotation.y += dt*0.03;
-  side3.rotation.y   += dt*0.008;
-  starMat.uniforms.uTime.value = t;
-  updateTransport();
-  composer.render();                 // bloom pipeline replaces renderer.render()
-}
-
-// deep-link to an act via hash (#6 → S6); defaults to opening act
-const startIdx = Math.max(0, Math.min(SCENES.length-1, (parseInt(location.hash.slice(1),10)||1) - 1));
-window.addEventListener('hashchange', ()=>{
-  const i = Math.max(0, Math.min(SCENES.length-1, (parseInt(location.hash.slice(1),10)||1) - 1));
-  enterScene(i);
-});
-
-const boot = document.getElementById('boot');
-requestAnimationFrame(()=>{
-  enterScene(startIdx);
-  updatePlayBtn(); paintMusic(); updateTransport();
-  bgm.play().catch(()=>{});      // muted autoplay — silent + in sync; the music button unmutes
-  animate();
-  setTimeout(()=>boot.classList.add('gone'), 400);
-});
+<script type="importmap">
+{ "imports": { "three": "./lib/three/three.module.min.js", "three/addons/": "./lib/three/addons/" } }
 </script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>
