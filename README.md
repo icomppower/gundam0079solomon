@@ -11,7 +11,7 @@ Part 2 of the Narrated History Map · Gundam U.C. 0079 trilogy
 
 ## v2 (October 2026): the bridge rebuild
 
-v1 (tag [`v1`](../../tree/v1)) was a free-camera diorama made from Three.js primitives.
+v1 (preserved on branch [`v1`](../../tree/v1)) was a free-camera diorama made from Three.js primitives.
 Space has no ground to give scale, so everything floated in black at the wrong size.
 v2 fixes that with five rules:
 
