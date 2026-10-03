@@ -21,11 +21,18 @@ v2 fixes that with five rules:
 4. **Small motion for scale.** Debris drifts past, companion ships hold formation, fleets close in.
 5. **Story from inside.** Bridge comms, act cards and narration carry the script.
 
+## Two views
+
+- **艦橋 Bridge** (default): first person, standing on Grey Heron's bridge.
+- **追蹤 Chase** (v2.1): third person, camera locked behind and above Grey Heron. The hull is the
+  scale anchor; near hits and the Solar System light the hull instead of the bridge, and our own
+  turrets fire. Same timeline, so switching never changes what happens.
+
 ## Controls
 
-Drag to look around · double-click to recentre · `Space` pause · `←` `→` previous/next act ·
-`H` hide HUD · `M` sound. The timeline scrubs.
-URL options: `?autostart` skips the title screen, `?t=95` jumps to 1:35.
+Drag to look around (orbit the ship in chase view) · double-click to recentre · `C` switch view ·
+`Space` pause · `←` `→` previous/next act · `H` hide HUD · `M` sound. The timeline scrubs.
+URL options: `?autostart` skips the title screen, `?t=95` jumps to 1:35, `?view=chase` opens in chase view.
 
 ## Layout
 
@@ -33,7 +40,8 @@ URL options: `?autostart` skips the title screen, `?t=95` jumps to 1:35.
 index.html                 page shell, HUD, title and end cards
 src/acts.js                the 10 acts: ship path, comms, narration, canon tags, timing
 src/main.js                runtime: space + bridge scenes, effects, act directors, audio, controls
-assets/*.glb               Blender-built models (fortress, bridge, ships) with baked AO
+assets/*.glb               Blender-built models (fortress, bridge, ships, hero ship) with baked AO
+assets/hero.json           Grey Heron gun tips, engines and lights (for the chase view)
 assets/fortress_lights.json  surface beacon positions
 tools/blender/build_assets.py  regenerates every asset from a fixed seed
 lib/three/                 vendored Three.js r160 (no CDN at runtime)

@@ -10,6 +10,7 @@ Outputs (assets/):
   fortress_lights.json  surface beacon positions/normals (rendered as glow points at runtime)
   bridge.glb            bridge interior of our fictional cruiser, AO baked
   ships.glb             original hulls: eff_cruiser, zeon_cruiser, zeon_armor
+  hero.glb / hero.json  蒼鷺號 Grey Heron, our own cruiser, detailed for the chase view (+ gun tips, engines, lights)
 
 Everything is generated from a fixed seed, so the build is deterministic.
 Every hull here is an original design; no canon mecha or ship is modelled.
@@ -453,9 +454,92 @@ def build_ships():
     export_glb(os.path.join(OUT, "ships.glb"), [a, b, c])
 
 
+# ============================================================ HERO SHIP ==
+# 蒼鷺號 Grey Heron — our own cruiser, seen up close in the chase view. Original design.
+# Blender: forward = -Y, up = +Z, metres. Exports with nose at glTF +Z (three.js lookAt convention).
+def build_hero():
+    print("hero", flush=True)
+    reset()
+    GREY = (0.60, 0.61, 0.62); DARKG = (0.36, 0.37, 0.39); RED = (0.55, 0.13, 0.11)
+
+    def hull_col(co, n):
+        # panel variation + red band behind the nose + darker belly
+        cell = (math.floor(co.x / 7.0), math.floor(co.y / 9.0), math.floor(co.z / 5.0))
+        k = 0.88 + 0.16 * (hash3(cell) - 0.5)
+        if -78 < co.y < -66 and co.z > 0: return (RED[0] * k, RED[1] * k, RED[2] * k)
+        g = GREY if co.z > -4 else DARKG
+        return (g[0] * k, g[1] * k, g[2] * k)
+
+    def hash3(c):
+        v = math.sin(c[0] * 12.9898 + c[1] * 78.233 + c[2] * 37.719) * 43758.5453
+        return v - math.floor(v)
+
+    objs = []
+    hull = box_object("hero_hull", [
+        ((0, 0, 0), (30, 22, 210), (math.pi / 2, 0, 0), (0.45, 2.2)),          # main hull, nose -Y
+        ((0, 15, -14), (22, 12, 150), (math.pi / 2, 0, 0), (0.35, 1.6)),       # keel
+        ((0, 95, 2), (42, 30, 52), None, None),                                # engine block
+        ((16, -5, 0), (6, 26, 7), None, None), ((-16, -5, 0), (6, 26, 7), None, None),  # side sponsons
+        ((20, 80, -2), (16, 34, 6), None, None), ((-20, 80, -2), (16, 34, 6), None, None),  # nacelle pylons
+        ((0, 112, 18), (3, 26, 20), (0.35, 0, 0), None),                       # dorsal fin
+    ], GREY, cuts=4)
+    set_albedo(hull, hull_col); objs.append(hull)
+    tower = box_object("hero_tower", [
+        ((0, 26, 19), (14, 30, 16), None, (0.85, 1.0)),                        # tower
+        ((0, 19, 30), (26, 13, 7), None, None),                                # bridge head
+        ((0, 27, 39), (1.2, 1.2, 14), None, None), ((0, 27, 43), (10, 1, 1), None, None),  # mast + yard
+        ((0, 34, 30), (8, 6, 4), None, None),                                  # sensor block
+    ], (0.66, 0.66, 0.66), cuts=2)
+    set_albedo(tower, hull_col); objs.append(tower)
+    nac = cyl_object("hero_nacelles", [((30, 80, -2), 9, 92, "y", 9), ((-30, 80, -2), 9, 92, "y", 9),
+                                       ((30, 33, -2), 6, 6, "y", 9), ((-30, 33, -2), 6, 6, "y", 9)], (0.52, 0.53, 0.55), segs=16)
+    objs.append(nac)
+    # turrets: (base centre, facing up(+1)/down(-1))
+    TUR = [((0, -25, 9.3), 1), ((0, -60, 7.6), 1), ((0, -22, -21.5), -1)]
+    tparts, bparts, tips = [], [], []
+    for (c, s_) in TUR:
+        x, y, z = c
+        tparts.append(((x, y, z + s_ * 1.6), 6.5, 3.2, "z", 5.8))
+        bparts.append(((x, y - 1, z + s_ * 4.2), (10, 11, 4.2), None, None))
+        for bx in (-2.3, 2.3):
+            bparts.append(((x + bx, y - 11, z + s_ * 4.4), (1.3, 16, 1.3), None, None))
+            tips.append((x + bx, y - 19.5, z + s_ * 4.4))
+    tb = cyl_object("hero_turret_bases", tparts, DARKG, segs=14); objs.append(tb)
+    tt = box_object("hero_turrets", bparts, (0.48, 0.49, 0.50), cuts=1); objs.append(tt)
+    bake_ao_into_col(objs, distance=18.0)
+
+    # emissive parts (coloured at runtime): windows, engine nozzles, running lights
+    win = box_object("hero_windows", [((0, 12.35, 30.8), (22, 0.5, 1.8), None, None),
+                                      ((12.9, 19, 30.8), (0.5, 9, 1.8), None, None), ((-12.9, 19, 30.8), (0.5, 9, 1.8), None, None)], (1, 1, 1), cuts=0)
+    eng = cyl_object("hero_engines", [((30, 126.6, -2), 7.4, 1.2, "y", 7.4), ((-30, 126.6, -2), 7.4, 1.2, "y", 7.4),
+                                      ((-11, 121.4, 2), 6, 1.2, "y", 6), ((11, 121.4, 2), 6, 1.2, "y", 6)], (1, 1, 1), segs=16)
+    # port (+X) red, starboard (-X) green
+    LIGHTS = [((39.5, 80, -2), (1, 0.1, 0.1)), ((-39.5, 80, -2), (0.1, 1, 0.2)), ((0, 27, 46.5), (1, 1, 1)), ((0, 124, 30), (1, 1, 1))]
+    lb = bmesh.new()
+    for (c, col) in LIGHTS:
+        tmp = bmesh.new(); bmesh.ops.create_cube(tmp, size=1.6)
+        for v in tmp.verts: v.co += Vector(c)
+        me = bpy.data.meshes.new("t"); tmp.to_mesh(me); tmp.free(); lb.from_mesh(me); bpy.data.meshes.remove(me)
+    lights = obj_from_bm(lb, "hero_lights")
+    def lcol(co, n):
+        best = min(LIGHTS, key=lambda L: (Vector(L[0]) - co).length); return best[1]
+    set_albedo(lights, lcol)
+    for o in (win, eng, lights):
+        me = o.data; alb = me.attributes["alb"]; col = me.attributes.new("Col", "FLOAT_COLOR", "POINT")
+        for i in range(len(me.vertices)): col.data[i].color = alb.data[i].color
+        me.attributes.remove(alb); me.color_attributes.active_color = me.color_attributes["Col"]
+    export_glb(os.path.join(OUT, "hero.glb"), objs + [win, eng, lights])
+    g = lambda p: [round(p[0], 2), round(p[2], 2), round(-p[1], 2)]  # Blender -> glTF
+    meta = {"length": 254, "gunTips": [g(t) for t in tips], "engines": [g((30, 128, -2)), g((-30, 128, -2)), g((-11, 123, 2)), g((11, 123, 2))],
+            "lights": [g(L[0]) + list(L[1]) for L in LIGHTS]}
+    with open(os.path.join(OUT, "hero.json"), "w") as f:
+        json.dump(meta, f, separators=(",", ":"))
+
+
 if __name__ == "__main__":
-    which = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["fortress", "bridge", "ships"]
+    which = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ["fortress", "bridge", "ships", "hero"]
     if "fortress" in which: build_fortress()
     if "bridge" in which: build_bridge()
     if "ships" in which: build_ships()
+    if "hero" in which: build_hero()
     print("done", flush=True)

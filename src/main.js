@@ -19,7 +19,8 @@ const ease = (t) => { t = clamp(t); return t * t * t * (t * (t * 6 - 15) + 10); 
 const bump = (a, b, c, d, x) => smooth(a, b, x) * (1 - smooth(c, d, x));
 function hash(n) { n = Math.sin(n * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); }
 function rngFrom(seed) { let s = seed >>> 0 || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpM = new THREE.Matrix4();
+const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpM = new THREE.Matrix4(), tmpC = new THREE.Color();
+const fract = (x) => x - Math.floor(x);
 const ORIGIN = new THREE.Vector3();
 const SUN = V(SUN_DIR).normalize();
 const MC = V(MIRROR_CENTER);
@@ -184,7 +185,7 @@ fortMat.onBeforeCompile = (sh) => {
         #define H3(o) fract(sin(dot(i + o, vec3(12.9898, 78.233, 37.719))) * 43758.5453)
         float n = mix(mix(mix(H3(vec3(0,0,0)), H3(vec3(1,0,0)), f.x), mix(H3(vec3(0,1,0)), H3(vec3(1,1,0)), f.x), f.y),
                       mix(mix(H3(vec3(0,0,1)), H3(vec3(1,0,1)), f.x), mix(H3(vec3(0,1,1)), H3(vec3(1,1,1)), f.x), f.y), f.z);
-        float fl = 0.7 + 0.3 * sin(uTime * 2.7 + n * 40.0);
+        float fl = 0.82 + 0.18 * sin(uTime * 2.1 + n * 5.0);
         float core = smoothstep(0.86, 0.99, dot(normalize(vObjP), uHitDir));
         vec3 hot = mix(vec3(1.0, 0.22, 0.04), vec3(1.0, 0.78, 0.45), core);
         totalEmissiveRadiance += uHeat * k * hot * (0.25 + 1.4 * n * n + 2.5 * core) * fl * 2.2; }`);
@@ -285,6 +286,23 @@ function ship(type, pos, target, opts = {}) {
   }
   return m;
 }
+/* ============================================================ hero ship == */
+// 蒼鷺號 Grey Heron — our own cruiser. Hidden in bridge view (we are inside it), the anchor of the chase view.
+const hero = new THREE.Group(); hero.visible = false; space.add(hero);
+let heroMeta = null;
+const heroHullMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.5, metalness: 0.4, emissive: 0x000000 });
+const heroWinMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.7, 0.9), toneMapped: false });
+const heroEngMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.45, 0.75, 1.25), toneMapped: false });
+const heroLightMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+const heroGuns = [], heroEngines = [];
+function placeHero(P) {
+  hero.position.copy(P); hero.lookAt(ORIGIN); hero.updateMatrixWorld();
+  heroGuns.length = 0; heroEngines.length = 0;
+  if (heroMeta) { for (const g of heroMeta.gunTips) heroGuns.push(V(g).applyMatrix4(hero.matrixWorld)); for (const e of heroMeta.engines) heroEngines.push(V(e).applyMatrix4(hero.matrixWorld)); }
+}
+const ourGuns = (P) => (heroGuns.length ? heroGuns.map((g) => g.clone()) : [P.clone()]);
+const CHASE = { back: 400, up: 150, side: 185, ahead: 420 };
+
 function shipsFlush() { for (const k in SHIPS.types) { const T = SHIPS.types[k]; for (let i = SHIPS.used[k]; i < T.list.length; i++) T.list[i].visible = false; SHIPS.used[k] = 0; } }
 
 /* =========================================================== big props == */
@@ -362,11 +380,12 @@ const stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.4, 0.7, 
 /* ============================================================== loading == */
 async function load() {
   const L = new GLTFLoader(), bar = document.getElementById('loadbar');
-  const files = ['assets/fortress.glb', 'assets/bridge.glb', 'assets/ships.glb'];
+  const files = ['assets/fortress.glb', 'assets/bridge.glb', 'assets/ships.glb', 'assets/hero.glb'];
   let done = 0; const tick = () => { done++; bar.style.width = `${(done / (files.length + 2)) * 100}%`; };
-  const [fg, bg, sg, lights] = await Promise.all([
+  const [fg, bg, sg, hg, lights, hmeta] = await Promise.all([
     ...files.map((f) => L.loadAsync(f).then((g) => (tick(), g))),
     fetch('assets/fortress_lights.json').then((r) => r.json()).then((j) => (tick(), j)),
+    fetch('assets/hero.json').then((r) => r.json()),
   ]);
   fg.scene.traverse((o) => { if (o.isMesh) { o.material = fortMat; o.frustumCulled = false; } });
   fortress.add(fg.scene);
@@ -378,6 +397,11 @@ async function load() {
   });
   bridgeRoot.add(bg.scene);
   shipPoolInit(sg);
+  hg.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.name.startsWith('hero_windows') ? heroWinMat : o.name.startsWith('hero_engines') ? heroEngMat : o.name.startsWith('hero_lights') ? heroLightMat : heroHullMat;
+  });
+  hero.add(hg.scene); heroMeta = hmeta;
   // beacons
   const L2 = lights.lights, n = L2.length, pos = new Float32Array(n * 3), ph = new Float32Array(n), az = new Float32Array(n);
   L2.forEach((l, i) => { pos.set([l[0] + l[3] * 10, l[1] + l[4] * 10, l[2] + l[5] * 10], i * 3); ph[i] = hash(i * 3.1); az[i] = (Math.atan2(l[2], l[0]) / Math.PI + 1) / 2; });
@@ -519,7 +543,7 @@ const DIRECTORS = {
     const F = swarm(14, 30, new THREE.Vector3(3400 - t * 70, 300, 6200 - t * 140), 1300, C.eff, t, { speed: 0.22 });
     exchange(15, Z, F, 4, C.zeonBeam, C.effBeam, t);
     for (let i = 0; i < 14; i++) boom(new THREE.Vector3(2600 + (hash(i) - 0.5) * 2600, 300 + (hash(i + 1) - 0.5) * 1400, 3600 + (hash(i + 2) - 0.5) * 2600), 3.5 + i * 0.95, 50 + hash(i + 3) * 90, t, C.fire, P);
-    if (t > 13.5) fleetFire(16, [P.clone().add(new THREE.Vector3(0, -40, -150)), ...comp, ...f1], ORIGIN, t, 3, C.effBeam, 900);
+    if (t > 13.5) fleetFire(16, [...ourGuns(P), ...comp, ...f1], ORIGIN, t, 3, C.effBeam, 900);
   },
   S4(t, P) {
     const alive = t < ACTS[3].hitAt ? [0, 1, 2, 3, 4] : [1, 2, 3, 4];
@@ -532,7 +556,7 @@ const DIRECTORS = {
     const F = swarm(45, 36, new THREE.Vector3(1200, 100, 4200), 1700, C.eff, t, { speed: 0.24 });
     exchange(46, Z, F, 6, C.zeonBeam, C.effBeam, t);
     fortressGuns(47, t, 5, P.clone().add(new THREE.Vector3(0, 0, -800)), 2600);
-    fleetFire(48, [P.clone().add(new THREE.Vector3(0, -40, -150)), ...comp, ...f1, ...f2], ORIGIN, t, 4, C.effBeam, 1000);
+    fleetFire(48, [...ourGuns(P), ...comp, ...f1, ...f2], ORIGIN, t, 4, C.effBeam, 1000);
     for (let i = 0; i < 16; i++) boom(new THREE.Vector3((hash(i + 40) - 0.3) * 3600, (hash(i + 41) - 0.5) * 2600, 2400 + hash(i + 42) * 3000), 1 + i * 1.05, 50 + hash(i + 43) * 110, t, C.fire, P);
     // the hit on our wingman
     const hitAt = ACTS[3].hitAt, w = V(COMPANIONS[0]).add(P);
@@ -613,7 +637,7 @@ const DIRECTORS = {
       const shot = (at, tgt) => { if (t > at && t < at + 0.8) { const a = 1 - (t - at) / 0.8; for (const o of [-14, 0, 14]) LINES.add(Apos.clone().add(new THREE.Vector3(o, 10, 0)), tgt, C.zeonBeam, a, 0.6); } };
       shot(6.2, victim3); shot(9.0, f1[1] || ORIGIN); shot(10.8, f1[4] || ORIGIN); shot(14.2, f1[2] || ORIGIN);
       if (t > 12.5) {
-        fleetFire(92, [P.clone().add(new THREE.Vector3(0, -40, -150)), ...comp, ...f1], Apos, t, 5, C.effBeam, 60);
+        fleetFire(92, [...ourGuns(P), ...comp, ...f1], Apos, t, 5, C.effBeam, 60);
         const h = Math.floor(t * 9); FLASH.add(Apos.clone().add(new THREE.Vector3(hash(h) - 0.5, hash(h + 1) - 0.5, hash(h + 2) - 0.5).multiplyScalar(80)), 60, C.amber, 0.7);
       }
     }
@@ -639,7 +663,7 @@ const DIRECTORS = {
 };
 
 /* ================================================================ state == */
-const S = { T: 0, paused: false, lastT: 0, hud: true, started: false, yaw: 0, pitch: 0, dragging: false, sound: false, ended: false };
+const S = { T: 0, paused: false, lastT: 0, hud: true, started: false, yaw: 0, pitch: 0, dragging: false, sound: false, ended: false, view: params.get('view') === 'chase' ? 'chase' : 'bridge' };
 const baseQ = new THREE.Quaternion(), headQ = new THREE.Quaternion(), shakeQ = new THREE.Quaternion(), eul = new THREE.Euler(0, 0, 0, 'YXZ');
 const lookM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0);
 const actOf = (T) => { let i = ACTS.length - 1; for (let k = 0; k < ACTS.length; k++) if (T < CUM[k] + DURS[k]) { i = k; break; } return i; };
@@ -719,6 +743,7 @@ function frame() {
   if (mirrorMat) mirrorMat.emissiveIntensity = 0;
   heatU.uHeat.value = 0;
   if (i >= 6 && mirrors) setMirrors(1, 1);
+  placeHero(P);
   DIRECTORS[act.id](tau, P);
   debris.visible = i >= 6; if (debris.visible) setDebris(act, tau);
 
@@ -727,9 +752,27 @@ function frame() {
   const sway = 0.006;
   eul.set(S.pitch + Math.sin(S.T * 0.31) * sway, S.yaw + Math.sin(S.T * 0.23) * sway, Math.sin(S.T * 0.17) * sway * 0.6); headQ.setFromEuler(eul);
   const sh = FX.shake * 0.02; eul.set((hash(S.T * 60) - 0.5) * sh, (hash(S.T * 60 + 1) - 0.5) * sh, (hash(S.T * 60 + 2) - 0.5) * sh * 2); shakeQ.setFromEuler(eul);
-  spaceCam.position.copy(P); spaceCam.quaternion.copy(baseQ).multiply(headQ).multiply(shakeQ);
-  bridgeCam.quaternion.copy(headQ).multiply(shakeQ);
-  stars.position.copy(P); sunGroup.position.copy(P);
+  const chase = S.view === 'chase';
+  hero.visible = chase; passBridge.enabled = !chase;
+  if (chase) {
+    // third person: camera locked behind and above our ship, aim leans toward whatever the act wants us to watch
+    const fwd = tmpV2.copy(ORIGIN).sub(P).normalize(), lookDir = fwd.clone();
+    if (FX.lookBias) lookDir.lerp(FX.lookBias.target.clone().sub(P).normalize(), FX.lookBias.w * 0.7).normalize();
+    const right = new THREE.Vector3().crossVectors(lookDir, UP).normalize();
+    const orbit = new THREE.Quaternion().setFromAxisAngle(UP, S.yaw).multiply(new THREE.Quaternion().setFromAxisAngle(right, -S.pitch * 0.7));
+    const camPos = lookDir.clone().multiplyScalar(-CHASE.back).addScaledVector(UP, CHASE.up).addScaledVector(right, CHASE.side).applyQuaternion(orbit).add(P);
+    camPos.y += Math.sin(S.T * 0.27) * 4; camPos.x += Math.sin(S.T * 0.19) * 5;
+    const aim = P.clone().addScaledVector(lookDir.clone().applyQuaternion(orbit), CHASE.ahead);
+    lookM.lookAt(camPos, aim, UP); spaceCam.position.copy(camPos); spaceCam.quaternion.setFromRotationMatrix(lookM).multiply(shakeQ);
+    stars.position.copy(camPos); sunGroup.position.copy(camPos);
+    // the hull takes the light the bridge used to take
+    heroHullMat.emissive.copy(FX.flashColor).multiplyScalar(Math.min(1.2, FX.flash * 0.3)).add(tmpC.setRGB(1, 1, 0.96).multiplyScalar(FX.white * 0.9));
+    for (const [k, e] of heroEngines.entries()) FLASH.add(e, k < 2 ? 15 : 11, C.engine, 0.34 + 0.06 * Math.sin(S.T * 23 + k));
+  } else {
+    spaceCam.position.copy(P); spaceCam.quaternion.copy(baseQ).multiply(headQ).multiply(shakeQ);
+    bridgeCam.quaternion.copy(headQ).multiply(shakeQ);
+    stars.position.copy(P); sunGroup.position.copy(P);
+  }
 
   // bridge lighting
   tmpV.copy(SUN).applyQuaternion(tmpQ.copy(baseQ).invert());   // sun in ship frame
@@ -741,6 +784,8 @@ function frame() {
   stripMat.color.setRGB(alert ? 1.6 + pulse : 1.4, alert ? 0.12 : 0.7, alert ? 0.08 : 0.2);
   screenMat.color.setRGB(0.25, 1.1 * (0.92 + 0.08 * Math.sin(S.T * 13)), 0.75);
   bHemi.intensity = 1.0 + FX.white * 2;
+  heroWinMat.color.setRGB(alert ? 2.4 * (0.6 + 0.4 * pulse) : 2.2, alert ? 0.25 : 1.7, alert ? 0.15 : 0.9);
+  heroLightMat.color.setScalar(fract(S.T * 0.7) < 0.12 ? 3 : 0.25);
   white.style.opacity = FX.white * 0.95;
   // fades between acts
   const f = Math.max(1 - smooth(0, 1.1, tau), i < ACTS.length - 1 ? smooth(act.D - 0.7, act.D, tau) : 0);
@@ -792,22 +837,34 @@ addEventListener('keydown', (e) => {
   else if (e.code === 'KeyH') { S.hud = !S.hud; document.body.classList.toggle('nohud', !S.hud); }
   else if (e.code === 'KeyM') setSound(!S.sound);
   else if (e.code === 'KeyR') { S.yaw = 0; S.pitch = 0; }
+  else if (e.code === 'KeyC') setView(S.view === 'chase' ? 'bridge' : 'chase');
 });
 addEventListener('resize', resize);
 
-function board(withSound) {
+const viewBtn = $('view-btn');
+function setView(v) {
+  S.view = v; S.yaw = 0; S.pitch = 0;
+  viewBtn.textContent = v === 'chase' ? '追蹤 Chase' : '艦橋 Bridge';
+  document.body.classList.toggle('chase', v === 'chase');
+}
+viewBtn.onclick = () => setView(S.view === 'chase' ? 'bridge' : 'chase');
+setView(S.view);
+
+function board(withSound, view) {
+  if (view) setView(view);
   $('title').classList.add('gone'); S.started = true; hud.classList.add('on');
   setSound(withSound); setPaused(false);
 }
 $('board').onclick = () => board(true);
 $('board-quiet').onclick = () => board(false);
+$('board-chase').onclick = () => board(true, 'chase');
 
 // test / embed hooks
-window.SOLOMON = { dbg: { space, spaceCam, earth: () => earth, fortress, renderer }, seek: (T) => seekTo(T), act: (k, tau = 0) => seekTo(CUM[k] + tau), hud: (on) => { S.hud = on; document.body.classList.toggle('nohud', !on); }, pause: setPaused, total: TOTAL, cum: CUM, start: () => board(false), state: S };
+window.SOLOMON = { dbg: { space, spaceCam, earth: () => earth, fortress, renderer }, seek: (T) => seekTo(T), act: (k, tau = 0) => seekTo(CUM[k] + tau), hud: (on) => { S.hud = on; document.body.classList.toggle('nohud', !on); }, pause: setPaused, view: setView, total: TOTAL, cum: CUM, start: () => board(false), state: S };
 
 resize();
 load().then(() => {
-  $('loading').classList.add('gone'); $('board').disabled = false; $('board-quiet').disabled = false;
+  $('loading').classList.add('gone'); $('board').disabled = false; $('board-quiet').disabled = false; $('board-chase').disabled = false;
   $('ship-name').textContent = `${SHIP_NAME.zh} ${SHIP_NAME.en}`;
   if (params.has('autostart')) board(false);
   if (params.has('t')) seekTo(parseFloat(params.get('t')));

@@ -15,7 +15,7 @@ export const DUEL_CENTER = [-5200, 1400, 400];       // S8: the distant duel, se
 // Companion ships in our formation, offsets from our position (world axes).
 export const COMPANIONS = [
   [-420, 60, -200],   // 0 — wingman, hit in S4
-  [380, -40, 150],
+  [600, -90, -150],
   [-700, -120, 500],
   [650, 140, -500],   // 3 — sunk by the mobile armour in S9
   [160, 240, 800],

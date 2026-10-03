@@ -73,6 +73,7 @@
   .transport { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); width: min(760px, 92vw); display: flex; align-items: center; gap: 14px; pointer-events: auto; }
   .transport button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; font-size: 12px; color: var(--ink); background: rgba(0,0,0,.35); flex: none; }
   .transport button.off { color: var(--dim); }
+  .transport button.viewbtn { width: auto; border-radius: 17px; padding: 0 12px; font: 500 11px/1 var(--sans); letter-spacing: .06em; }
   #prog { position: relative; flex: 1; height: 22px; cursor: pointer; touch-action: none; }
   #prog::before { content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: rgba(255,255,255,.14); }
   #fill { position: absolute; left: 0; top: 10px; height: 2px; background: var(--gold); }
@@ -94,6 +95,9 @@
     #narr-t { font-size: 13.5px; }
     .subs { bottom: calc(68px + env(safe-area-inset-bottom)); }
     .credit { display: none; }
+    #clock { min-width: 0; font-size: 10px; }
+    .transport { gap: 9px; }
+    .transport button.viewbtn { padding: 0 9px; }
   }
 </style>
 </head>
@@ -105,7 +109,7 @@
 
 <div id="hud" class="layer">
   <div id="act"></div>
-  <div id="keys"><kbd>拖曳</kbd>環顧 <kbd>雙擊</kbd>回正 <kbd>SPACE</kbd>暫停 <kbd>← →</kbd>切幕 <kbd>H</kbd>隱藏 <kbd>M</kbd>聲音</div>
+  <div id="keys"><kbd>拖曳</kbd>環顧 <kbd>雙擊</kbd>回正 <kbd>SPACE</kbd>暫停 <kbd>← →</kbd>切幕 <kbd>C</kbd>視角 <kbd>H</kbd>隱藏 <kbd>M</kbd>聲音</div>
   <div id="card"><div id="card-n"></div><div id="card-t"></div><div id="card-e"></div></div>
   <div class="subs">
     <div id="comms"><span id="comms-w"></span><span id="comms-t"></span><span id="comms-e"></span></div>
@@ -115,6 +119,7 @@
     <button id="play" aria-label="play / pause">❚❚</button>
     <div id="prog" aria-label="timeline"><div id="ticks"></div><div id="fill"></div></div>
     <div id="clock">0:00 / 3:30</div>
+    <button id="view-btn" class="viewbtn" aria-label="camera view">艦橋 Bridge</button>
     <button id="mute" class="off" aria-label="sound">🔇</button>
   </div>
   <div class="credit">Built by Johnny Lai · icomppower</div>
@@ -131,10 +136,11 @@
     <div class="t-ship">▸ <span id="ship-name"></span> · 第二聯合艦隊</div>
     <div class="t-btns">
       <button class="b-main" id="board" disabled>登艦 · Board</button>
-      <button class="b-alt" id="board-quiet" disabled>靜音觀看 · Muted</button>
+      <button class="b-alt" id="board-chase" disabled>第三人稱 · Chase view</button>
+      <button class="b-alt" id="board-quiet" disabled>靜音 · Muted</button>
     </div>
     <div id="loading">LOADING<div class="bar"><div id="loadbar"></div></div></div>
-    <div class="t-keys">拖曳環顧艦橋 · drag to look around · 約 3 分 30 秒</div>
+    <div class="t-keys">拖曳環顧 · drag to look around · C 切換艦橋 / 第三人稱 · 約 3 分 30 秒</div>
   </div>
   <div class="t-fan">Fan work. Mobile Suit Gundam © Sotsu · Sunrise. Not affiliated. The cruiser, its crew and all hulls shown are original designs.</div>
 </div>
