@@ -9,6 +9,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ACTS, TRANSITION, SUN_DIR, MIRROR_CENTER, MIRROR_RADIUS, DUEL_CENTER, COMPANIONS, SHIP_NAME, ESCORT_SLOTS, ESCORT_LOST, RAIDS } from './acts.js';
+import { createVoice, VOICE_LABEL } from './voice.js';
 
 /* ================================================================ utils == */
 const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -737,7 +738,7 @@ const S = { T: 0, paused: false, lastT: 0, hud: true, started: false, yaw: 0, pi
 const baseQ = new THREE.Quaternion(), headQ = new THREE.Quaternion(), shakeQ = new THREE.Quaternion(), eul = new THREE.Euler(0, 0, 0, 'YXZ');
 const lookM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0);
 const actOf = (T) => { let i = ACTS.length - 1; for (let k = 0; k < ACTS.length; k++) if (T < CUM[k] + DURS[k]) { i = k; break; } return i; };
-ACTS.forEach((a, i) => { a.D = DURS[i]; a.idx = i; });
+ACTS.forEach((a, i) => { a.D = DURS[i]; a.idx = i; a.comms.forEach((c, k) => { c.row = k + 1; }); });
 
 /* ================================================================ audio == */
 const bgm = document.getElementById('bgm');
@@ -751,7 +752,13 @@ function audioInit() {
   const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
   hum = AC.createGain(); hum.gain.value = 0.0; src.connect(lp).connect(hum).connect(master); src.start();
   AC.noiseBuf = buf;
+  voice.attach(AC, master);
 }
+// voiced bridge comms: one file per comms line, language picked by the voice button (EN / 粵 / 日)
+const voice = createVoice('solomon');
+voice.onActive = (on) => { bgm.volume = on ? 0.5 : 1; };   // duck the music under speech
+// browsers only start audio after a gesture: unlock on the first pointerdown anywhere
+addEventListener('pointerdown', () => { if (S.sound) { audioInit(); AC.resume(); } }, { once: true, capture: true });
 function rumble(gain, dur = 1.6, freq = 120) {
   if (!AC || !S.sound) return;
   const s = AC.createBufferSource(); s.buffer = AC.noiseBuf; const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq;
@@ -866,7 +873,7 @@ function frame() {
   // audio cues on forward playback
   if (S.started && !S.paused && i === lastAct) {
     for (const e of FX.events) if (e.t0 > lastTau && e.t0 <= tau) { const d = e.pos.distanceTo(P); rumble(clamp(1.4 - d / (e.size * 12)) * 0.9 + 0.05, 1.2 + e.size / 300); }
-    for (const c of act.comms) if (c[0] > lastTau && c[0] <= tau) beep();
+    for (const c of act.comms) if (c[0] > lastTau && c[0] <= tau) { beep(); if (S.sound) voice.play(i + 1, c.row, c[4], c[5] === 1); }
     if (act.fireAt && act.fireAt > lastTau && act.fireAt <= tau) { rumble(1.6, 6, 70); rumble(0.8, 3, 400); }
   }
   if (hum) hum.gain.value = S.sound ? 0.18 + (alert ? 0.06 : 0) : 0;
@@ -879,12 +886,16 @@ function frame() {
 }
 
 /* ============================================================== controls == */
-function seekTo(T) { S.T = clamp(T, 0, TOTAL - 0.001); S.ended = false; $('end').classList.remove('on'); }
+function seekTo(T) { S.T = clamp(T, 0, TOTAL - 0.001); S.ended = false; $('end').classList.remove('on'); voice.stop(); }
 function goAct(k) { seekTo(CUM[clamp(k, 0, ACTS.length - 1)] + 0.01); }
-function setPaused(p) { S.paused = p; playBtn.textContent = p ? '▶' : '❚❚'; syncMusic(); }
+function setPaused(p) { S.paused = p; playBtn.textContent = p ? '▶' : '❚❚'; if (p) voice.pause(); else voice.resume(); syncMusic(); }
 function syncMusic() { if (S.sound && !S.paused && S.started && !S.ended) { bgm.currentTime = Math.min(S.T, bgm.duration || 1e9) % (bgm.duration || 1e9); bgm.play().catch(() => {}); } else bgm.pause(); }
-function setSound(on) { S.sound = on; bgm.muted = !on; muteBtn.textContent = on ? '🔊' : '🔇'; muteBtn.classList.toggle('off', !on); if (on) { audioInit(); AC.resume(); } syncMusic(); }
+function setSound(on) { S.sound = on; bgm.muted = !on; muteBtn.textContent = on ? '🔊' : '🔇'; muteBtn.classList.toggle('off', !on); if (on) { audioInit(); AC.resume(); } else voice.stop(); syncMusic(); }
 function end() { S.ended = true; $('end').classList.add('on'); bgm.pause(); }
+const voiceBtn = $('voice-btn');
+const paintVoice = () => { voiceBtn.textContent = `語音 ${VOICE_LABEL[voice.lang]}`; };
+voiceBtn.onclick = () => { voice.cycle(); paintVoice(); };
+paintVoice();
 playBtn.onclick = () => setPaused(!S.paused);
 muteBtn.onclick = () => setSound(!S.sound);
 $('replay').onclick = () => { seekTo(0); setPaused(false); syncMusic(); };
@@ -908,6 +919,7 @@ addEventListener('keydown', (e) => {
   else if (e.code === 'ArrowLeft') goAct(actOf(S.T) - (S.T - CUM[actOf(S.T)] < 2 ? 1 : 0));
   else if (e.code === 'KeyH') { S.hud = !S.hud; document.body.classList.toggle('nohud', !S.hud); }
   else if (e.code === 'KeyM') setSound(!S.sound);
+  else if (e.code === 'KeyV') { voice.cycle(); paintVoice(); }
   else if (e.code === 'KeyR') { S.yaw = 0; S.pitch = 0; }
   else if (e.code === 'KeyC') setView(S.view === 'chase' ? 'bridge' : 'chase');
 });

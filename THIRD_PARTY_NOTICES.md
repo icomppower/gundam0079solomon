@@ -56,7 +56,7 @@ the generated output files.
 
 ## 3. Music
 
-`lib/Rise of the Iron Vanguard.mp3` — carried over from the series' Part 1
+`lib/rise_of_the_iron_vanguard.mp3` — carried over from the series' Part 1
 (`gundam0079odessa`), same terms as in that project.
 
 ## 4. Earth, Moon and stars
